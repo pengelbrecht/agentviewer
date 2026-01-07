@@ -1172,6 +1172,63 @@ html, body {
     text-align: left;
 }
 
+/* Image content styling */
+.content-image {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: var(--content-padding);
+    min-height: 100%;
+}
+
+.content-image .image-figure {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 100%;
+    margin: 0;
+}
+
+.content-image .image-display {
+    max-width: 100%;
+    max-height: calc(100vh - 150px);
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    background: var(--bg-tertiary);
+    object-fit: contain;
+}
+
+.content-image .image-caption {
+    margin-top: 1em;
+    font-size: var(--font-size-small);
+    color: var(--text-secondary);
+    text-align: center;
+    max-width: 600px;
+}
+
+.content-image .image-error {
+    max-width: var(--content-max-width);
+    padding: 2em;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    text-align: center;
+}
+
+.content-image .image-error h3 {
+    color: #ef4444;
+    margin-bottom: 0.5em;
+}
+
+.content-image .image-error p {
+    color: var(--text-secondary);
+}
+
+/* Light mode adjustments for image shadow */
+[data-theme="light"] .content-image .image-display {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
 /* KaTeX math styling */
 .katex-display {
     margin: 1em 0;

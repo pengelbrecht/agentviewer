@@ -2,6 +2,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log"
 	"os"
@@ -200,6 +201,8 @@ func DetectContentType(filename, content string) TabType {
 			return TabTypeDiff
 		case ".mmd", ".mermaid":
 			return TabTypeMermaid
+		case ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp":
+			return TabTypeImage
 		}
 		// Default to code for known source files
 		if lang := DetectLanguage(filename, content); lang != "" {
@@ -792,4 +795,79 @@ func parseHunkRange(s, prefix string) (start, count int, err error) {
 	}
 
 	return start, count, nil
+}
+
+// IsImageFile checks if a file is an image based on its extension.
+func IsImageFile(filename string) bool {
+	if filename == "" {
+		return false
+	}
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp":
+		return true
+	}
+	return false
+}
+
+// GetImageMIMEType returns the MIME type for an image file extension.
+func GetImageMIMEType(filename string) string {
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".gif":
+		return "image/gif"
+	case ".svg":
+		return "image/svg+xml"
+	case ".webp":
+		return "image/webp"
+	}
+	return "application/octet-stream"
+}
+
+// ReadImageAsDataURL reads an image file and returns it as a base64-encoded data URL.
+// This is suitable for embedding images directly in HTML/JSON responses.
+func ReadImageAsDataURL(path string) (string, error) {
+	// Validate and clean the path (includes security checks)
+	cleanPath, err := ValidatePath(path)
+	if err != nil {
+		return "", err
+	}
+
+	// Get file info to validate the path
+	info, err := os.Stat(cleanPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("image file not found: %s", cleanPath)
+		}
+		return "", fmt.Errorf("cannot access image file: %w", err)
+	}
+
+	// Ensure it's a regular file
+	if info.IsDir() {
+		return "", fmt.Errorf("path is a directory, not an image file: %s", cleanPath)
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("path is not a regular file: %s", cleanPath)
+	}
+
+	// Check if it's an image file
+	if !IsImageFile(cleanPath) {
+		return "", fmt.Errorf("file is not a recognized image format: %s", cleanPath)
+	}
+
+	// Read the file content
+	data, err := os.ReadFile(cleanPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read image file: %w", err)
+	}
+
+	// Get MIME type and encode as data URL
+	mimeType := GetImageMIMEType(cleanPath)
+	encoded := base64.StdEncoding.EncodeToString(data)
+
+	return fmt.Sprintf("data:%s;base64,%s", mimeType, encoded), nil
 }

@@ -307,6 +307,10 @@
                 html = `<div class="content-mermaid">${renderMermaid(tab.content)}</div>`;
                 break;
 
+            case 'image':
+                html = `<div class="content-image">${renderImage(tab.content, tab.title)}</div>`;
+                break;
+
             default:
                 html = `<pre class="content-plain">${escapeHtml(tab.content)}</pre>`;
         }
@@ -629,6 +633,38 @@
         }, 0);
 
         return `<div id="${containerId}" class="mermaid-container"></div>`;
+    }
+
+    // Render image content (expects a data URL or URL string)
+    function renderImage(content, title) {
+        // Handle empty content
+        if (!content) {
+            return `<div class="image-error">
+                <h3>No Image Content</h3>
+                <p>The image content is empty or unavailable.</p>
+            </div>`;
+        }
+
+        // Create the image element with appropriate alt text
+        const altText = title ? escapeHtml(title) : 'Image';
+
+        // Check if content is a data URL or a regular URL
+        const isDataUrl = content.startsWith('data:');
+        const isUrl = content.startsWith('http://') || content.startsWith('https://') || content.startsWith('/');
+
+        if (!isDataUrl && !isUrl) {
+            // Content might be raw base64, try to wrap it
+            // Attempt to detect image type from magic bytes or default to png
+            return `<div class="image-error">
+                <h3>Invalid Image Format</h3>
+                <p>The image content is not in a recognized format (expected data URL or URL).</p>
+            </div>`;
+        }
+
+        return `<figure class="image-figure">
+            <img src="${content}" alt="${altText}" class="image-display" loading="lazy" />
+            ${title ? `<figcaption class="image-caption">${escapeHtml(title)}</figcaption>` : ''}
+        </figure>`;
     }
 
     // Render diff using diff2html-ui for side-by-side view with syntax highlighting

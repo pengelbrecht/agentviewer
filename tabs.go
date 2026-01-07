@@ -16,6 +16,7 @@ const (
 	TabTypeCode     TabType = "code"
 	TabTypeDiff     TabType = "diff"
 	TabTypeMermaid  TabType = "mermaid"
+	TabTypeImage    TabType = "image"
 )
 
 // Tab represents a single tab in the viewer.

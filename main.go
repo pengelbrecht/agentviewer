@@ -18,7 +18,7 @@ USAGE:
   agentviewer --help
 
 DESCRIPTION:
-  Starts a localhost HTTP server that displays markdown, code, and diffs
+  Starts a localhost HTTP server that displays markdown, code, diffs, and images
   in a browser. AI agents update content via REST API (curl).
 
   Once running, update content with:
@@ -29,7 +29,7 @@ DESCRIPTION:
 OPTIONS:
   --port, -p <PORT>     HTTP server port (default: 3333)
   --open, -o            Open browser automatically on start
-  --type, -t <TYPE>     Content type: markdown, code, diff (default: auto-detect)
+  --type, -t <TYPE>     Content type: markdown, code, diff, image (default: auto-detect)
   --title <TITLE>       Tab title (default: filename)
   --version, -v         Show version information
   --help, -h            Show this help message
@@ -38,6 +38,7 @@ CONTENT TYPES:
   markdown    Rendered with GFM, Mermaid diagrams, LaTeX math
   code        Syntax highlighted source code
   diff        Side-by-side file comparison
+  image       Display images (PNG, JPG, JPEG, GIF, SVG, WebP)
 
 API ENDPOINTS:
   POST   /api/tabs              Create or update a tab
@@ -95,7 +96,7 @@ func runServe(args []string) {
 	fs.IntVar(port, "p", 3333, "HTTP server port (shorthand)")
 	openBrowser := fs.Bool("open", false, "Open browser on start")
 	fs.BoolVar(openBrowser, "o", false, "Open browser on start (shorthand)")
-	contentType := fs.String("type", "", "Content type (markdown, code, diff)")
+	contentType := fs.String("type", "", "Content type (markdown, code, diff, image)")
 	fs.StringVar(contentType, "t", "", "Content type (shorthand)")
 	title := fs.String("title", "", "Tab title")
 
