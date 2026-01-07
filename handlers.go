@@ -18,8 +18,8 @@ type CreateTabRequest struct {
 	File        string   `json:"file,omitempty"`
 	Language    string   `json:"language,omitempty"`
 	Diff        *DiffReq `json:"diff,omitempty"`
-	Path        string   `json:"path,omitempty"`        // File path for git-based diffs
-	GitDiffMode string   `json:"diffMode,omitempty"`    // Git diff mode: unstaged, staged, head, commit:<sha>, range:<from>..<to>
+	Path        string   `json:"path,omitempty"`     // File path for git-based diffs
+	GitDiffMode string   `json:"diffMode,omitempty"` // Git diff mode: unstaged, staged, head, commit:<sha>, range:<from>..<to>
 }
 
 // DiffReq holds diff-specific request parameters.

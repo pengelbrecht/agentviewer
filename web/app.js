@@ -107,7 +107,6 @@
         ws.onopen = () => {
             console.log('WebSocket connected');
             reconnectAttempts = 0;
-            updateConnectionStatus(true);
         };
 
         ws.onmessage = (event) => {
@@ -121,7 +120,6 @@
 
         ws.onclose = () => {
             console.log('WebSocket disconnected');
-            updateConnectionStatus(false);
             scheduleReconnect();
         };
 
@@ -137,28 +135,6 @@
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), maxReconnectDelay);
         console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts})...`);
         setTimeout(connectWebSocket, delay);
-    }
-
-    // Update connection status indicator
-    function updateConnectionStatus(connected) {
-        let indicator = document.getElementById('connection-status');
-        if (!indicator) {
-            indicator = document.createElement('div');
-            indicator.id = 'connection-status';
-            document.body.appendChild(indicator);
-        }
-
-        indicator.className = connected ? 'connected' : 'disconnected';
-        indicator.title = connected ? 'Connected' : 'Disconnected - reconnecting...';
-
-        // Hide indicator after a short delay when connected
-        if (connected) {
-            setTimeout(() => {
-                indicator.classList.add('fade-out');
-            }, 2000);
-        } else {
-            indicator.classList.remove('fade-out');
-        }
     }
 
     // Handle WebSocket messages

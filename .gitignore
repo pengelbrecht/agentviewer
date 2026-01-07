@@ -27,3 +27,6 @@ Thumbs.db
 
 # Build
 dist/
+
+# Ralph worktrees (parallel execution)
+.ralph-worktrees/
