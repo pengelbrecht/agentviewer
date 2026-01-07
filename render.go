@@ -378,3 +378,247 @@ func CompareFiles(leftPath, rightPath string) (*DiffResult, error) {
 	}
 	return ComputeDiff(leftPath, rightPath, leftContent, rightContent), nil
 }
+
+// ParseUnifiedDiff parses a unified diff string (git diff output) into structured DiffResult.
+// Supports standard unified diff format with --- and +++ headers and @@ hunk markers.
+func ParseUnifiedDiff(diffText string) (*DiffResult, error) {
+	result := &DiffResult{
+		Hunks:   make([]DiffHunk, 0),
+		Unified: diffText,
+	}
+
+	lines := strings.Split(diffText, "\n")
+	if len(lines) == 0 {
+		return result, nil
+	}
+
+	var currentHunk *DiffHunk
+	oldLineNum := 0
+	newLineNum := 0
+
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+
+		// Parse file headers: --- a/path or --- path
+		if strings.HasPrefix(line, "--- ") {
+			path := parseFilePath(line[4:])
+			result.LeftPath = path
+			continue
+		}
+
+		// Parse file headers: +++ b/path or +++ path
+		if strings.HasPrefix(line, "+++ ") {
+			path := parseFilePath(line[4:])
+			result.RightPath = path
+			continue
+		}
+
+		// Parse hunk header: @@ -start,count +start,count @@ [optional context]
+		if strings.HasPrefix(line, "@@ ") {
+			if currentHunk != nil {
+				result.Hunks = append(result.Hunks, *currentHunk)
+			}
+
+			hunk, err := parseHunkHeader(line)
+			if err != nil {
+				return nil, fmt.Errorf("parsing hunk header at line %d: %w", i+1, err)
+			}
+			currentHunk = hunk
+			oldLineNum = hunk.OldStart
+			newLineNum = hunk.NewStart
+			continue
+		}
+
+		// Skip diff command line, index line, and other metadata
+		if strings.HasPrefix(line, "diff ") ||
+			strings.HasPrefix(line, "index ") ||
+			strings.HasPrefix(line, "new file") ||
+			strings.HasPrefix(line, "deleted file") ||
+			strings.HasPrefix(line, "similarity") ||
+			strings.HasPrefix(line, "rename ") ||
+			strings.HasPrefix(line, "Binary ") {
+			continue
+		}
+
+		// Parse diff lines within a hunk
+		if currentHunk != nil {
+			if len(line) == 0 {
+				// Empty line in a diff could be a context line (space was trimmed)
+				// or end of hunk. Treat as context if we're still expecting lines.
+				expectedLines := currentHunk.OldLines + currentHunk.NewLines - len(currentHunk.Lines)
+				if expectedLines > 0 {
+					dl := DiffLine{
+						Type:    "context",
+						Content: "\n",
+						OldNum:  oldLineNum,
+						NewNum:  newLineNum,
+					}
+					currentHunk.Lines = append(currentHunk.Lines, dl)
+					oldLineNum++
+					newLineNum++
+				}
+				continue
+			}
+
+			prefix := line[0]
+			content := ""
+			if len(line) > 1 {
+				content = line[1:]
+			}
+			// Ensure content has a newline for consistency
+			if !strings.HasSuffix(content, "\n") {
+				content = content + "\n"
+			}
+
+			switch prefix {
+			case ' ':
+				// Context line
+				dl := DiffLine{
+					Type:    "context",
+					Content: content,
+					OldNum:  oldLineNum,
+					NewNum:  newLineNum,
+				}
+				currentHunk.Lines = append(currentHunk.Lines, dl)
+				oldLineNum++
+				newLineNum++
+			case '-':
+				// Deletion
+				dl := DiffLine{
+					Type:    "delete",
+					Content: content,
+					OldNum:  oldLineNum,
+				}
+				currentHunk.Lines = append(currentHunk.Lines, dl)
+				oldLineNum++
+			case '+':
+				// Addition
+				dl := DiffLine{
+					Type:    "add",
+					Content: content,
+					NewNum:  newLineNum,
+				}
+				currentHunk.Lines = append(currentHunk.Lines, dl)
+				newLineNum++
+			case '\\':
+				// "\ No newline at end of file" - skip but remove trailing newline from previous
+				if len(currentHunk.Lines) > 0 {
+					lastLine := &currentHunk.Lines[len(currentHunk.Lines)-1]
+					lastLine.Content = strings.TrimSuffix(lastLine.Content, "\n")
+				}
+			}
+		}
+	}
+
+	// Don't forget the last hunk
+	if currentHunk != nil {
+		result.Hunks = append(result.Hunks, *currentHunk)
+	}
+
+	return result, nil
+}
+
+// parseFilePath extracts the file path from a --- or +++ line.
+// Handles formats like "a/path/to/file", "b/path/to/file", or just "path/to/file".
+// Also handles timestamp suffixes.
+func parseFilePath(s string) string {
+	// Trim whitespace
+	s = strings.TrimSpace(s)
+
+	// Remove timestamp (e.g., "2024-01-15 10:30:00.000000000 +0000")
+	if idx := strings.Index(s, "\t"); idx != -1 {
+		s = s[:idx]
+	}
+
+	// Handle /dev/null
+	if s == "/dev/null" {
+		return s
+	}
+
+	// Strip a/ or b/ prefix if present (git diff format)
+	if strings.HasPrefix(s, "a/") || strings.HasPrefix(s, "b/") {
+		return s[2:]
+	}
+
+	return s
+}
+
+// parseHunkHeader parses @@ -old_start,old_count +new_start,new_count @@ context
+func parseHunkHeader(line string) (*DiffHunk, error) {
+	// Format: @@ -old_start,old_count +new_start,new_count @@ [context]
+	// Or: @@ -old_start +new_start @@ (count of 1 is implicit)
+
+	if !strings.HasPrefix(line, "@@ ") {
+		return nil, fmt.Errorf("invalid hunk header: %s", line)
+	}
+
+	// Find the closing @@
+	endIdx := strings.Index(line[3:], " @@")
+	if endIdx == -1 {
+		// Try without trailing space
+		endIdx = strings.Index(line[3:], "@@")
+		if endIdx == -1 {
+			return nil, fmt.Errorf("missing closing @@ in hunk header: %s", line)
+		}
+	}
+
+	rangeStr := line[3 : 3+endIdx]
+
+	// Parse the range part: -old_start,old_count +new_start,new_count
+	parts := strings.Fields(rangeStr)
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("invalid hunk range: %s", rangeStr)
+	}
+
+	oldPart := parts[0] // -start,count or -start
+	newPart := parts[1] // +start,count or +start
+
+	oldStart, oldCount, err := parseHunkRange(oldPart, "-")
+	if err != nil {
+		return nil, fmt.Errorf("invalid old range %s: %w", oldPart, err)
+	}
+
+	newStart, newCount, err := parseHunkRange(newPart, "+")
+	if err != nil {
+		return nil, fmt.Errorf("invalid new range %s: %w", newPart, err)
+	}
+
+	return &DiffHunk{
+		OldStart: oldStart,
+		OldLines: oldCount,
+		NewStart: newStart,
+		NewLines: newCount,
+		Lines:    make([]DiffLine, 0),
+	}, nil
+}
+
+// parseHunkRange parses a range like "-10,5" or "+20,3" or "-10" (count=1 implicit)
+func parseHunkRange(s, prefix string) (start, count int, err error) {
+	if !strings.HasPrefix(s, prefix) {
+		return 0, 0, fmt.Errorf("expected prefix %s", prefix)
+	}
+
+	numStr := s[1:] // Remove prefix
+
+	if idx := strings.Index(numStr, ","); idx != -1 {
+		// Has count
+		_, err = fmt.Sscanf(numStr, "%d,%d", &start, &count)
+		if err != nil {
+			return 0, 0, err
+		}
+	} else {
+		// No count, implicit 1
+		_, err = fmt.Sscanf(numStr, "%d", &start)
+		if err != nil {
+			return 0, 0, err
+		}
+		count = 1
+	}
+
+	// Handle edge case: count of 0 means empty (file created/deleted)
+	if start == 0 && count == 0 {
+		start = 1
+	}
+
+	return start, count, nil
+}

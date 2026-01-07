@@ -464,6 +464,408 @@ func TestCompareFiles(t *testing.T) {
 	})
 }
 
+func TestParseUnifiedDiff(t *testing.T) {
+	t.Run("basic git diff", func(t *testing.T) {
+		diffText := `diff --git a/file.go b/file.go
+index abc123..def456 100644
+--- a/file.go
++++ b/file.go
+@@ -1,3 +1,3 @@
+ package main
+-old line
++new line
+ func main() {}`
+
+		result, err := ParseUnifiedDiff(diffText)
+		if err != nil {
+			t.Fatalf("ParseUnifiedDiff failed: %v", err)
+		}
+
+		if result.LeftPath != "file.go" {
+			t.Errorf("Expected LeftPath 'file.go', got %q", result.LeftPath)
+		}
+		if result.RightPath != "file.go" {
+			t.Errorf("Expected RightPath 'file.go', got %q", result.RightPath)
+		}
+		if len(result.Hunks) != 1 {
+			t.Fatalf("Expected 1 hunk, got %d", len(result.Hunks))
+		}
+
+		hunk := result.Hunks[0]
+		if hunk.OldStart != 1 || hunk.OldLines != 3 {
+			t.Errorf("Expected old range 1,3 got %d,%d", hunk.OldStart, hunk.OldLines)
+		}
+		if hunk.NewStart != 1 || hunk.NewLines != 3 {
+			t.Errorf("Expected new range 1,3 got %d,%d", hunk.NewStart, hunk.NewLines)
+		}
+
+		// Check we have context, delete, add, context
+		if len(hunk.Lines) != 4 {
+			t.Errorf("Expected 4 lines, got %d", len(hunk.Lines))
+		}
+
+		hasDelete := false
+		hasAdd := false
+		for _, line := range hunk.Lines {
+			if line.Type == "delete" && contains(line.Content, "old line") {
+				hasDelete = true
+			}
+			if line.Type == "add" && contains(line.Content, "new line") {
+				hasAdd = true
+			}
+		}
+		if !hasDelete {
+			t.Error("Expected delete line")
+		}
+		if !hasAdd {
+			t.Error("Expected add line")
+		}
+	})
+
+	t.Run("diff without a/ b/ prefix", func(t *testing.T) {
+		diffText := `--- old.txt	2024-01-15 10:30:00.000000000 +0000
++++ new.txt	2024-01-15 10:31:00.000000000 +0000
+@@ -1,2 +1,2 @@
+ hello
+-world
++Go`
+
+		result, err := ParseUnifiedDiff(diffText)
+		if err != nil {
+			t.Fatalf("ParseUnifiedDiff failed: %v", err)
+		}
+
+		if result.LeftPath != "old.txt" {
+			t.Errorf("Expected LeftPath 'old.txt', got %q", result.LeftPath)
+		}
+		if result.RightPath != "new.txt" {
+			t.Errorf("Expected RightPath 'new.txt', got %q", result.RightPath)
+		}
+	})
+
+	t.Run("multiple hunks", func(t *testing.T) {
+		diffText := `--- a/file.go
++++ b/file.go
+@@ -1,3 +1,3 @@
+ line1
+-old1
++new1
+ line3
+@@ -10,3 +10,3 @@
+ line10
+-old2
++new2
+ line12`
+
+		result, err := ParseUnifiedDiff(diffText)
+		if err != nil {
+			t.Fatalf("ParseUnifiedDiff failed: %v", err)
+		}
+
+		if len(result.Hunks) != 2 {
+			t.Fatalf("Expected 2 hunks, got %d", len(result.Hunks))
+		}
+
+		if result.Hunks[0].OldStart != 1 {
+			t.Errorf("First hunk OldStart should be 1, got %d", result.Hunks[0].OldStart)
+		}
+		if result.Hunks[1].OldStart != 10 {
+			t.Errorf("Second hunk OldStart should be 10, got %d", result.Hunks[1].OldStart)
+		}
+	})
+
+	t.Run("new file", func(t *testing.T) {
+		diffText := `diff --git a/newfile.go b/newfile.go
+new file mode 100644
+index 0000000..abc123
+--- /dev/null
++++ b/newfile.go
+@@ -0,0 +1,3 @@
++package main
++
++func main() {}`
+
+		result, err := ParseUnifiedDiff(diffText)
+		if err != nil {
+			t.Fatalf("ParseUnifiedDiff failed: %v", err)
+		}
+
+		if result.LeftPath != "/dev/null" {
+			t.Errorf("Expected LeftPath '/dev/null', got %q", result.LeftPath)
+		}
+		if result.RightPath != "newfile.go" {
+			t.Errorf("Expected RightPath 'newfile.go', got %q", result.RightPath)
+		}
+
+		if len(result.Hunks) != 1 {
+			t.Fatalf("Expected 1 hunk, got %d", len(result.Hunks))
+		}
+
+		// All lines should be additions
+		for _, line := range result.Hunks[0].Lines {
+			if line.Type != "add" {
+				t.Errorf("Expected all lines to be 'add', got %q", line.Type)
+			}
+		}
+	})
+
+	t.Run("deleted file", func(t *testing.T) {
+		diffText := `diff --git a/oldfile.go b/oldfile.go
+deleted file mode 100644
+index abc123..0000000
+--- a/oldfile.go
++++ /dev/null
+@@ -1,3 +0,0 @@
+-package main
+-
+-func main() {}`
+
+		result, err := ParseUnifiedDiff(diffText)
+		if err != nil {
+			t.Fatalf("ParseUnifiedDiff failed: %v", err)
+		}
+
+		if result.LeftPath != "oldfile.go" {
+			t.Errorf("Expected LeftPath 'oldfile.go', got %q", result.LeftPath)
+		}
+		if result.RightPath != "/dev/null" {
+			t.Errorf("Expected RightPath '/dev/null', got %q", result.RightPath)
+		}
+
+		// All lines should be deletions
+		for _, line := range result.Hunks[0].Lines {
+			if line.Type != "delete" {
+				t.Errorf("Expected all lines to be 'delete', got %q", line.Type)
+			}
+		}
+	})
+
+	t.Run("line numbers tracking", func(t *testing.T) {
+		diffText := `--- a/file.go
++++ b/file.go
+@@ -5,4 +5,5 @@
+ context1
+-deleted
++added1
++added2
+ context2`
+
+		result, err := ParseUnifiedDiff(diffText)
+		if err != nil {
+			t.Fatalf("ParseUnifiedDiff failed: %v", err)
+		}
+
+		hunk := result.Hunks[0]
+
+		// First context line should be at old=5, new=5
+		if hunk.Lines[0].OldNum != 5 || hunk.Lines[0].NewNum != 5 {
+			t.Errorf("First context line numbers wrong: old=%d, new=%d",
+				hunk.Lines[0].OldNum, hunk.Lines[0].NewNum)
+		}
+
+		// Deleted line should be at old=6, new=0
+		if hunk.Lines[1].OldNum != 6 || hunk.Lines[1].NewNum != 0 {
+			t.Errorf("Deleted line numbers wrong: old=%d, new=%d",
+				hunk.Lines[1].OldNum, hunk.Lines[1].NewNum)
+		}
+
+		// First added line should be at old=0, new=6
+		if hunk.Lines[2].OldNum != 0 || hunk.Lines[2].NewNum != 6 {
+			t.Errorf("First added line numbers wrong: old=%d, new=%d",
+				hunk.Lines[2].OldNum, hunk.Lines[2].NewNum)
+		}
+
+		// Second added line should be at old=0, new=7
+		if hunk.Lines[3].OldNum != 0 || hunk.Lines[3].NewNum != 7 {
+			t.Errorf("Second added line numbers wrong: old=%d, new=%d",
+				hunk.Lines[3].OldNum, hunk.Lines[3].NewNum)
+		}
+
+		// Last context line should be at old=7, new=8
+		if hunk.Lines[4].OldNum != 7 || hunk.Lines[4].NewNum != 8 {
+			t.Errorf("Last context line numbers wrong: old=%d, new=%d",
+				hunk.Lines[4].OldNum, hunk.Lines[4].NewNum)
+		}
+	})
+
+	t.Run("empty diff", func(t *testing.T) {
+		result, err := ParseUnifiedDiff("")
+		if err != nil {
+			t.Fatalf("ParseUnifiedDiff failed: %v", err)
+		}
+		if len(result.Hunks) != 0 {
+			t.Errorf("Expected 0 hunks for empty diff, got %d", len(result.Hunks))
+		}
+	})
+
+	t.Run("no newline at end of file marker", func(t *testing.T) {
+		diffText := `--- a/file.go
++++ b/file.go
+@@ -1,2 +1,2 @@
+ line1
+-old
+\ No newline at end of file
++new`
+
+		result, err := ParseUnifiedDiff(diffText)
+		if err != nil {
+			t.Fatalf("ParseUnifiedDiff failed: %v", err)
+		}
+
+		// The deleted line should not have trailing newline
+		for _, line := range result.Hunks[0].Lines {
+			if line.Type == "delete" && contains(line.Content, "old") {
+				if contains(line.Content, "\n") {
+					t.Error("Deleted line should not have newline when '\\' marker present")
+				}
+			}
+		}
+	})
+
+	t.Run("implicit count of 1", func(t *testing.T) {
+		diffText := `--- a/file.go
++++ b/file.go
+@@ -5 +5 @@
+-old
++new`
+
+		result, err := ParseUnifiedDiff(diffText)
+		if err != nil {
+			t.Fatalf("ParseUnifiedDiff failed: %v", err)
+		}
+
+		if len(result.Hunks) != 1 {
+			t.Fatalf("Expected 1 hunk, got %d", len(result.Hunks))
+		}
+
+		hunk := result.Hunks[0]
+		if hunk.OldLines != 1 || hunk.NewLines != 1 {
+			t.Errorf("Expected implicit count of 1, got old=%d, new=%d",
+				hunk.OldLines, hunk.NewLines)
+		}
+	})
+
+	t.Run("hunk with function context", func(t *testing.T) {
+		diffText := `--- a/file.go
++++ b/file.go
+@@ -10,3 +10,3 @@ func processData() {
+ context
+-old
++new`
+
+		result, err := ParseUnifiedDiff(diffText)
+		if err != nil {
+			t.Fatalf("ParseUnifiedDiff failed: %v", err)
+		}
+
+		if len(result.Hunks) != 1 {
+			t.Fatalf("Expected 1 hunk, got %d", len(result.Hunks))
+		}
+	})
+
+	t.Run("preserves unified diff text", func(t *testing.T) {
+		diffText := `--- a/file.go
++++ b/file.go
+@@ -1,2 +1,2 @@
+ line1
+-old
++new`
+
+		result, err := ParseUnifiedDiff(diffText)
+		if err != nil {
+			t.Fatalf("ParseUnifiedDiff failed: %v", err)
+		}
+
+		if result.Unified != diffText {
+			t.Error("Unified field should preserve original diff text")
+		}
+	})
+}
+
+func TestParseFilePath(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"a/path/to/file.go", "path/to/file.go"},
+		{"b/path/to/file.go", "path/to/file.go"},
+		{"path/to/file.go", "path/to/file.go"},
+		{"/dev/null", "/dev/null"},
+		{"a/file.go\t2024-01-15 10:30:00", "file.go"},
+		{"  b/file.go  ", "file.go"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := parseFilePath(tt.input)
+			if result != tt.expected {
+				t.Errorf("parseFilePath(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseHunkHeader(t *testing.T) {
+	tests := []struct {
+		name                                       string
+		input                                      string
+		expectErr                                  bool
+		oldStart, oldLines, newStart, newLines int
+	}{
+		{
+			name:     "standard format",
+			input:    "@@ -10,5 +20,6 @@",
+			oldStart: 10, oldLines: 5, newStart: 20, newLines: 6,
+		},
+		{
+			name:     "with function context",
+			input:    "@@ -10,5 +20,6 @@ func main() {",
+			oldStart: 10, oldLines: 5, newStart: 20, newLines: 6,
+		},
+		{
+			name:     "implicit count of 1",
+			input:    "@@ -10 +20 @@",
+			oldStart: 10, oldLines: 1, newStart: 20, newLines: 1,
+		},
+		{
+			name:     "new file with count 0",
+			input:    "@@ -0,0 +1,3 @@",
+			oldStart: 1, oldLines: 0, newStart: 1, newLines: 3,
+		},
+		{
+			name:      "invalid - no closing @@",
+			input:     "@@ -10,5 +20,6",
+			expectErr: true,
+		},
+		{
+			name:      "invalid - missing range",
+			input:     "@@ @@",
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hunk, err := parseHunkHeader(tt.input)
+			if tt.expectErr {
+				if err == nil {
+					t.Error("Expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if hunk.OldStart != tt.oldStart || hunk.OldLines != tt.oldLines ||
+				hunk.NewStart != tt.newStart || hunk.NewLines != tt.newLines {
+				t.Errorf("Got -%d,%d +%d,%d, want -%d,%d +%d,%d",
+					hunk.OldStart, hunk.OldLines, hunk.NewStart, hunk.NewLines,
+					tt.oldStart, tt.oldLines, tt.newStart, tt.newLines)
+			}
+		})
+	}
+}
+
 // Helper to check if string contains substring
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
