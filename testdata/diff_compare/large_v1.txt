@@ -1,0 +1,117 @@
+# Large File Test - Version 1
+# This file contains many lines to test diff performance
+
+## Section 1: Introduction
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. 
+Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+Ut enim ad minim veniam, quis nostrud exercitation ullamco.
+Laboris nisi ut aliquip ex ea commodo consequat.
+
+## Section 2: Data
+
+Line 10: Value A
+Line 11: Value B
+Line 12: Value C
+Line 13: Value D
+Line 14: Value E
+Line 15: Value F
+Line 16: Value G
+Line 17: Value H
+Line 18: Value I
+Line 19: Value J
+Line 20: Value K
+Line 21: Value L
+Line 22: Value M
+Line 23: Value N
+Line 24: Value O
+Line 25: Value P
+Line 26: Value Q
+Line 27: Value R
+Line 28: Value S
+Line 29: Value T
+Line 30: Value U
+Line 31: Value V
+Line 32: Value W
+Line 33: Value X
+Line 34: Value Y
+Line 35: Value Z
+
+## Section 3: Configuration
+
+config.setting1 = true
+config.setting2 = false
+config.setting3 = "value"
+config.setting4 = 42
+config.setting5 = 3.14
+config.setting6 = [1, 2, 3]
+config.setting7 = {"key": "value"}
+config.setting8 = null
+
+## Section 4: Code Examples
+
+```python
+def example_function():
+    x = 10
+    y = 20
+    return x + y
+```
+
+```javascript
+function anotherExample() {
+    const data = [1, 2, 3];
+    return data.map(x => x * 2);
+}
+```
+
+## Section 5: Tables
+
+| Column 1 | Column 2 | Column 3 |
+|----------|----------|----------|
+| A1       | B1       | C1       |
+| A2       | B2       | C2       |
+| A3       | B3       | C3       |
+| A4       | B4       | C4       |
+| A5       | B5       | C5       |
+
+## Section 6: Lists
+
+1. First item
+2. Second item
+3. Third item
+4. Fourth item
+5. Fifth item
+
+- Bullet one
+- Bullet two
+- Bullet three
+- Bullet four
+- Bullet five
+
+## Section 7: Repeated Content
+
+This paragraph appears here.
+And this line too.
+More content follows.
+The text continues.
+Additional lines here.
+
+This paragraph appears here.
+And this line too.
+More content follows.
+The text continues.
+Additional lines here.
+
+## Section 8: Numbers
+
+001 002 003 004 005 006 007 008 009 010
+011 012 013 014 015 016 017 018 019 020
+021 022 023 024 025 026 027 028 029 030
+031 032 033 034 035 036 037 038 039 040
+041 042 043 044 045 046 047 048 049 050
+
+## Section 9: End
+
+This is the final section of version 1.
+The file ends here.
+Goodbye!

@@ -1,0 +1,31 @@
+Unicode Test File (Updated)
+
+Basic Latin: Hello World!
+Extended Latin: cafe resume naive
+Accented: cafe resume naive (corrected accents)
+
+Greek: Alpha Beta Gamma Delta Epsilon Zeta
+Cyrillic: Privet Mir (Hello World)
+
+Japanese:
+  Hiragana: (This is a test)
+  Katakana: (This is a test)
+
+Chinese: (Hello World)
+
+Emoji: Hello world! Have a great day!
+
+Math symbols: infinity = approximately 3.14159...
+              sqrt(2) approximately 1.414
+
+Arrows: left right up down double arrows: left right
+
+Box drawing (extended):
+
+Currency: $100 100 100 100 100
+
+Special: (c) (r) (tm) ... -- --- (updated)
+
+New section - RTL text:
+Arabic:
+Hebrew:

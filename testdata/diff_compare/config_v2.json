@@ -1,0 +1,34 @@
+{
+  "name": "agentviewer",
+  "version": "0.2.0",
+  "description": "A rich viewer for agent outputs with diff support",
+  "settings": {
+    "port": 8080,
+    "host": "0.0.0.0",
+    "debug": true,
+    "timeout": 60,
+    "maxConnections": 100
+  },
+  "features": {
+    "markdown": true,
+    "code": true,
+    "diff": true,
+    "images": true
+  },
+  "database": {
+    "type": "postgres",
+    "host": "localhost",
+    "port": 5432,
+    "name": "agentviewer",
+    "user": "admin"
+  },
+  "logging": {
+    "level": "debug",
+    "file": "/var/log/agentviewer.log",
+    "format": "json"
+  },
+  "api": {
+    "rateLimit": 1000,
+    "cors": ["*"]
+  }
+}

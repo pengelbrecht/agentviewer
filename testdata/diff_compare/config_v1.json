@@ -1,0 +1,24 @@
+{
+  "name": "agentviewer",
+  "version": "0.1.0",
+  "description": "A viewer for agent outputs",
+  "settings": {
+    "port": 8080,
+    "host": "localhost",
+    "debug": false,
+    "timeout": 30
+  },
+  "features": {
+    "markdown": true,
+    "code": true,
+    "diff": false
+  },
+  "database": {
+    "type": "sqlite",
+    "path": "./data.db"
+  },
+  "logging": {
+    "level": "info",
+    "file": null
+  }
+}

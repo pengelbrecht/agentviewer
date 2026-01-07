@@ -1,0 +1,14 @@
+Hello, World!
+
+This is the original file.
+It contains some text that will be modified.
+
+Line 5 stays the same.
+Line 6 will be changed.
+Line 7 stays the same.
+
+This paragraph describes the purpose
+of the application. It processes
+user requests and returns results.
+
+The end.
