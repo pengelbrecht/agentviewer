@@ -14,9 +14,22 @@
 
     // Initialize
     function init() {
+        initVendorLibs();
         connectWebSocket();
         loadTabs();
         setupKeyboardShortcuts();
+    }
+
+    // Initialize vendor libraries
+    function initVendorLibs() {
+        // Initialize mermaid
+        if (typeof mermaid !== 'undefined') {
+            mermaid.initialize({
+                startOnLoad: false,
+                theme: 'dark',
+                securityLevel: 'loose'
+            });
+        }
     }
 
     // WebSocket Connection
@@ -180,15 +193,112 @@
                 break;
 
             default:
-                html = `<pre>${escapeHtml(tab.content)}</pre>`;
+                html = `<pre class="content-plain">${escapeHtml(tab.content)}</pre>`;
         }
 
         contentArea.innerHTML = html;
+
+        // Post-render hooks
+        postRenderContent(tab.type);
     }
 
-    // Render markdown (basic implementation - will be enhanced with marked.js)
+    // Post-render processing for content types
+    function postRenderContent(type) {
+        if (type === 'markdown') {
+            // Highlight code blocks in markdown
+            if (typeof hljs !== 'undefined') {
+                contentArea.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+            }
+
+            // Render mermaid diagrams
+            if (typeof mermaid !== 'undefined') {
+                contentArea.querySelectorAll('.mermaid').forEach((el, i) => {
+                    const code = el.textContent;
+                    el.setAttribute('id', `mermaid-${i}-${Date.now()}`);
+                    mermaid.render(`mermaid-graph-${i}-${Date.now()}`, code).then(result => {
+                        el.innerHTML = result.svg;
+                    }).catch(err => {
+                        console.error('Mermaid render error:', err);
+                        el.innerHTML = `<pre class="mermaid-error">Mermaid error: ${escapeHtml(err.message || String(err))}</pre>`;
+                    });
+                });
+            }
+
+            // Render KaTeX math
+            if (typeof katex !== 'undefined') {
+                renderKatexInContent();
+            }
+        }
+    }
+
+    // Render KaTeX math expressions
+    function renderKatexInContent() {
+        // Render display math: $$...$$
+        contentArea.querySelectorAll('.katex-display').forEach((el) => {
+            try {
+                katex.render(el.textContent, el, { displayMode: true, throwOnError: false });
+            } catch (e) {
+                console.error('KaTeX display error:', e);
+            }
+        });
+
+        // Render inline math: $...$
+        contentArea.querySelectorAll('.katex-inline').forEach((el) => {
+            try {
+                katex.render(el.textContent, el, { displayMode: false, throwOnError: false });
+            } catch (e) {
+                console.error('KaTeX inline error:', e);
+            }
+        });
+    }
+
+    // Configure marked.js
+    function configureMarked() {
+        if (typeof marked === 'undefined') return;
+
+        // Custom renderer for mermaid and math
+        const renderer = new marked.Renderer();
+
+        // Handle code blocks
+        renderer.code = function(code, language) {
+            // Mermaid diagrams
+            if (language === 'mermaid') {
+                return `<div class="mermaid">${escapeHtml(code)}</div>`;
+            }
+
+            // Regular code blocks - highlight.js will process them post-render
+            const langClass = language ? `language-${escapeHtml(language)}` : '';
+            return `<pre><code class="${langClass}">${escapeHtml(code)}</code></pre>`;
+        };
+
+        // Handle math in paragraphs and text
+        const originalParagraph = renderer.paragraph.bind(renderer);
+        renderer.paragraph = function(text) {
+            // Replace display math: $$...$$
+            text = text.replace(/\$\$([^$]+)\$\$/g, '<span class="katex-display">$1</span>');
+            // Replace inline math: $...$
+            text = text.replace(/\$([^$\n]+)\$/g, '<span class="katex-inline">$1</span>');
+            return originalParagraph(text);
+        };
+
+        marked.setOptions({
+            renderer: renderer,
+            gfm: true,
+            breaks: false,
+            pedantic: false
+        });
+    }
+
+    // Render markdown using marked.js
     function renderMarkdown(content) {
-        // Basic markdown rendering - will use marked.js when vendor libs are added
+        if (typeof marked !== 'undefined') {
+            configureMarked();
+            return marked.parse(content);
+        }
+
+        // Fallback: basic markdown rendering
         let html = escapeHtml(content);
 
         // Headers
@@ -211,20 +321,53 @@
         return html;
     }
 
-    // Render code (basic implementation - will be enhanced with highlight.js)
+    // Render code using highlight.js
     function renderCode(content, language) {
-        // Basic code rendering - will use highlight.js when vendor libs are added
-        const lines = escapeHtml(content).split('\n');
-        return lines.map((line, i) =>
-            `<div class="code-line"><span class="line-number">${i + 1}</span><span class="line-content">${line}</span></div>`
-        ).join('');
+        const lines = content.split('\n');
+        let highlightedCode = escapeHtml(content);
+
+        // Use highlight.js if available
+        if (typeof hljs !== 'undefined') {
+            try {
+                if (language && hljs.getLanguage(language)) {
+                    highlightedCode = hljs.highlight(content, { language: language }).value;
+                } else {
+                    highlightedCode = hljs.highlightAuto(content).value;
+                }
+            } catch (e) {
+                console.error('Highlight error:', e);
+                highlightedCode = escapeHtml(content);
+            }
+        }
+
+        // Wrap with line numbers
+        const highlightedLines = highlightedCode.split('\n');
+        return `<table class="code-table"><tbody>${
+            highlightedLines.map((line, i) =>
+                `<tr class="code-line"><td class="line-number">${i + 1}</td><td class="line-content">${line || ' '}</td></tr>`
+            ).join('')
+        }</tbody></table>`;
     }
 
-    // Render diff (basic implementation - will be enhanced with diff2html)
+    // Render diff using diff2html
     function renderDiff(content) {
-        // Basic diff rendering - will use diff2html when vendor libs are added
+        // Use diff2html if available
+        if (typeof Diff2Html !== 'undefined') {
+            try {
+                return Diff2Html.html(content, {
+                    drawFileList: false,
+                    matching: 'lines',
+                    outputFormat: 'side-by-side',
+                    renderNothingWhenEmpty: false
+                });
+            } catch (e) {
+                console.error('Diff2Html error:', e);
+            }
+        }
+
+        // Fallback: basic diff rendering
         const lines = escapeHtml(content).split('\n');
-        return lines.map(line => {
+        return `<div class="diff-fallback">${lines.map(line => {
             let className = 'diff-line';
             if (line.startsWith('+') && !line.startsWith('+++')) {
                 className += ' diff-add';
@@ -234,7 +377,7 @@
                 className += ' diff-hunk';
             }
             return `<div class="${className}">${line}</div>`;
-        }).join('');
+        }).join('')}</div>`;
     }
 
     // Activate a tab
