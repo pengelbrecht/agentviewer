@@ -198,6 +198,8 @@ func DetectContentType(filename, content string) TabType {
 			return TabTypeMarkdown
 		case ".diff", ".patch":
 			return TabTypeDiff
+		case ".mmd", ".mermaid":
+			return TabTypeMermaid
 		}
 		// Default to code for known source files
 		if lang := DetectLanguage(filename, content); lang != "" {

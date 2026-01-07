@@ -1101,6 +1101,77 @@ html, body {
     border-left: 4px solid #ef4444;
 }
 
+/* Standalone mermaid content (for .mmd/.mermaid files) */
+.content-mermaid {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: var(--content-padding);
+}
+
+.content-mermaid .mermaid-container {
+    text-align: center;
+    background: var(--bg-tertiary);
+    padding: 2em;
+    border-radius: 8px;
+    min-width: 200px;
+    max-width: 100%;
+    overflow: auto;
+}
+
+.content-mermaid .mermaid-container.mermaid-rendered {
+    background: transparent;
+    padding: 0;
+}
+
+.content-mermaid .mermaid-container svg {
+    max-width: 100%;
+    height: auto;
+}
+
+.content-mermaid .mermaid-error {
+    max-width: var(--content-max-width);
+    text-align: left;
+}
+
+.content-mermaid .mermaid-error h3 {
+    margin-bottom: 0.5em;
+    color: #ef4444;
+}
+
+.content-mermaid .mermaid-error p {
+    margin-bottom: 1em;
+    color: var(--text-secondary);
+}
+
+.content-mermaid .mermaid-error pre {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-small);
+    background: var(--code-bg);
+    padding: 1em;
+    border-radius: 4px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.content-mermaid .mermaid-fallback {
+    color: var(--text-secondary);
+}
+
+.content-mermaid .mermaid-fallback p {
+    margin-bottom: 1em;
+}
+
+.content-mermaid .mermaid-fallback pre {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-small);
+    background: var(--code-bg);
+    padding: 1em;
+    border-radius: 4px;
+    text-align: left;
+}
+
 /* KaTeX math styling */
 .katex-display {
     margin: 1em 0;

@@ -64,6 +64,36 @@ func TestDetectContentType(t *testing.T) {
 			content:  "",
 			expected: TabTypeDiff,
 		},
+		{
+			name:     "mermaid file .mmd extension",
+			filename: "diagram.mmd",
+			content:  "graph TD\n    A --> B",
+			expected: TabTypeMermaid,
+		},
+		{
+			name:     "mermaid file .mermaid extension",
+			filename: "flowchart.mermaid",
+			content:  "sequenceDiagram\n    Alice->>Bob: Hello",
+			expected: TabTypeMermaid,
+		},
+		{
+			name:     "mermaid file uppercase MMD",
+			filename: "DIAGRAM.MMD",
+			content:  "",
+			expected: TabTypeMermaid,
+		},
+		{
+			name:     "mermaid file uppercase MERMAID",
+			filename: "CHART.MERMAID",
+			content:  "",
+			expected: TabTypeMermaid,
+		},
+		{
+			name:     "mermaid file mixed case",
+			filename: "flow.Mmd",
+			content:  "",
+			expected: TabTypeMermaid,
+		},
 
 		// Code files - extension overrides content
 		{
@@ -375,6 +405,20 @@ func TestDetectContentType_ExtensionPriority(t *testing.T) {
 		result := DetectContentType("file.go", "--- old\n+++ new")
 		if result != TabTypeCode {
 			t.Errorf("Expected code for .go file, got %v", result)
+		}
+	})
+
+	t.Run("mermaid extension beats markdown content", func(t *testing.T) {
+		result := DetectContentType("diagram.mmd", "# Header\n## Another header")
+		if result != TabTypeMermaid {
+			t.Errorf("Expected mermaid for .mmd file, got %v", result)
+		}
+	})
+
+	t.Run("mermaid extension beats code content", func(t *testing.T) {
+		result := DetectContentType("flow.mermaid", "package main\nfunc main() {}")
+		if result != TabTypeMermaid {
+			t.Errorf("Expected mermaid for .mermaid file, got %v", result)
 		}
 	})
 }

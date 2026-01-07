@@ -15,6 +15,7 @@ const (
 	TabTypeMarkdown TabType = "markdown"
 	TabTypeCode     TabType = "code"
 	TabTypeDiff     TabType = "diff"
+	TabTypeMermaid  TabType = "mermaid"
 )
 
 // Tab represents a single tab in the viewer.

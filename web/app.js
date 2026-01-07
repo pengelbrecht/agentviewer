@@ -303,6 +303,10 @@
                 html = `<div class="content-diff">${renderDiff(tab.content, tab)}</div>`;
                 break;
 
+            case 'mermaid':
+                html = `<div class="content-mermaid">${renderMermaid(tab.content)}</div>`;
+                break;
+
             default:
                 html = `<pre class="content-plain">${escapeHtml(tab.content)}</pre>`;
         }
@@ -591,6 +595,40 @@
                 `<tr class="code-line"><td class="line-number">${i + 1}</td><td class="line-content">${line || ' '}</td></tr>`
             ).join('')
         }</tbody></table>`;
+    }
+
+    // Render standalone mermaid diagram (for .mmd/.mermaid files)
+    function renderMermaid(content) {
+        // Generate a unique ID for the mermaid diagram
+        const containerId = 'mermaid-standalone-' + Date.now();
+
+        // Schedule rendering after the element is in the DOM
+        setTimeout(() => {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            if (typeof mermaid !== 'undefined') {
+                mermaid.render(`mermaid-render-${Date.now()}`, content).then(result => {
+                    container.innerHTML = result.svg;
+                    container.classList.add('mermaid-rendered');
+                }).catch(err => {
+                    console.error('Mermaid render error:', err);
+                    container.innerHTML = `<div class="mermaid-error">
+                        <h3>Mermaid Diagram Error</h3>
+                        <p>${escapeHtml(err.message || String(err))}</p>
+                        <pre>${escapeHtml(content)}</pre>
+                    </div>`;
+                });
+            } else {
+                // Mermaid library not available, show raw content
+                container.innerHTML = `<div class="mermaid-fallback">
+                    <p>Mermaid library not loaded</p>
+                    <pre>${escapeHtml(content)}</pre>
+                </div>`;
+            }
+        }, 0);
+
+        return `<div id="${containerId}" class="mermaid-container"></div>`;
     }
 
     // Render diff using diff2html-ui for side-by-side view with syntax highlighting
