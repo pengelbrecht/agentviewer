@@ -4,18 +4,22 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
 // CreateTabRequest is the request body for creating a tab.
 type CreateTabRequest struct {
-	ID       string   `json:"id,omitempty"`
-	Title    string   `json:"title"`
-	Type     string   `json:"type"`
-	Content  string   `json:"content,omitempty"`
-	File     string   `json:"file,omitempty"`
-	Language string   `json:"language,omitempty"`
-	Diff     *DiffReq `json:"diff,omitempty"`
+	ID          string   `json:"id,omitempty"`
+	Title       string   `json:"title"`
+	Type        string   `json:"type"`
+	Content     string   `json:"content,omitempty"`
+	File        string   `json:"file,omitempty"`
+	Language    string   `json:"language,omitempty"`
+	Diff        *DiffReq `json:"diff,omitempty"`
+	Path        string   `json:"path,omitempty"`        // File path for git-based diffs
+	GitDiffMode string   `json:"diffMode,omitempty"`    // Git diff mode: unstaged, staged, head, commit:<sha>, range:<from>..<to>
 }
 
 // DiffReq holds diff-specific request parameters.
@@ -87,8 +91,8 @@ func (s *Server) handleCreateTab(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate diff type has diff data
-	if req.Type == "diff" && req.Diff == nil && req.Content == "" && req.File == "" {
-		writeError(w, http.StatusBadRequest, "Diff type requires 'diff' object, 'content', or 'file'")
+	if req.Type == "diff" && req.Diff == nil && req.Content == "" && req.File == "" && req.Path == "" {
+		writeError(w, http.StatusBadRequest, "Diff type requires 'diff' object, 'content', 'file', or 'path' (for git diff)")
 		return
 	}
 
@@ -103,8 +107,38 @@ func (s *Server) handleCreateTab(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Handle diff type
+	// Handle git-based diff when path is provided
 	var diffMeta *DiffMeta
+	if req.Type == "diff" && req.Path != "" && content == "" {
+		// Parse the diff mode (defaults to "unstaged")
+		mode, err := ParseDiffMode(req.GitDiffMode)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "Invalid diffMode: "+err.Error())
+			return
+		}
+
+		// Compute the git diff
+		diffOutput, err := GitDiff(req.Path, mode)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "Git diff failed: "+err.Error())
+			return
+		}
+
+		content = diffOutput
+
+		// Set diff metadata with appropriate labels
+		diffMeta = &DiffMeta{
+			LeftLabel:  modeLeftLabel(mode),
+			RightLabel: modeRightLabel(mode),
+		}
+
+		// Set default title if not provided
+		if req.Title == "" {
+			req.Title = formatGitDiffTitle(req.Path, mode)
+		}
+	}
+
+	// Handle diff type (traditional diff object)
 	if req.Type == "diff" && req.Diff != nil {
 		diffMeta = &DiffMeta{
 			LeftLabel:  req.Diff.LeftLabel,
@@ -307,4 +341,86 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 // writeError writes an error response.
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, ErrorResponse{Error: msg})
+}
+
+// modeLeftLabel returns the left label for the diff based on the mode.
+func modeLeftLabel(mode DiffMode) string {
+	switch mode.Type {
+	case "unstaged":
+		return "Index (staged)"
+	case "staged":
+		return "HEAD"
+	case "head":
+		return "HEAD"
+	case "commit":
+		return mode.Ref + "^"
+	case "range":
+		// Extract the "from" part of "from..to"
+		parts := splitRange(mode.Ref)
+		return parts[0]
+	default:
+		return "a"
+	}
+}
+
+// modeRightLabel returns the right label for the diff based on the mode.
+func modeRightLabel(mode DiffMode) string {
+	switch mode.Type {
+	case "unstaged":
+		return "Working Directory"
+	case "staged":
+		return "Index (staged)"
+	case "head":
+		return "Working Directory"
+	case "commit":
+		return mode.Ref
+	case "range":
+		// Extract the "to" part of "from..to"
+		parts := splitRange(mode.Ref)
+		if len(parts) > 1 {
+			return parts[1]
+		}
+		return parts[0]
+	default:
+		return "b"
+	}
+}
+
+// splitRange splits a git range "from..to" or "from...to" into parts.
+func splitRange(ref string) []string {
+	// Handle triple-dot first
+	if idx := strings.Index(ref, "..."); idx != -1 {
+		return []string{ref[:idx], ref[idx+3:]}
+	}
+	// Handle double-dot
+	if idx := strings.Index(ref, ".."); idx != -1 {
+		return []string{ref[:idx], ref[idx+2:]}
+	}
+	return []string{ref}
+}
+
+// formatGitDiffTitle formats a title for a git diff tab.
+func formatGitDiffTitle(path string, mode DiffMode) string {
+	// Use the filename as the base title
+	filename := filepath.Base(path)
+
+	switch mode.Type {
+	case "unstaged":
+		return filename + " (unstaged)"
+	case "staged":
+		return filename + " (staged)"
+	case "head":
+		return filename + " (vs HEAD)"
+	case "commit":
+		// Shorten the commit SHA for the title
+		shortRef := mode.Ref
+		if len(shortRef) > 8 {
+			shortRef = shortRef[:8]
+		}
+		return filename + " (" + shortRef + ")"
+	case "range":
+		return filename + " (" + mode.Ref + ")"
+	default:
+		return filename
+	}
 }
