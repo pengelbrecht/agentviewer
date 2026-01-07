@@ -443,3 +443,299 @@ graph LR
 		t.Log("Mermaid diagram survived theme toggle")
 	}
 }
+
+// TestBrowserKatexInlineMath verifies inline math ($...$) renders correctly.
+func TestBrowserKatexInlineMath(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	mathContent := `# Inline Math Test
+
+The quadratic formula is $x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}$.
+
+Einstein's famous equation: $E = mc^2$.
+
+And here's a Greek letter: $\alpha + \beta = \gamma$.
+`
+
+	createTestTab(t, baseURL, "Inline Math", "markdown", mathContent)
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var katexSpanCount int
+	var hasKatexHTML bool
+	var katexSampleHTML string
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible(`.content-markdown`, chromedp.ByQuery),
+		chromedp.Sleep(1*time.Second),
+		// Count katex-inline spans that have been rendered
+		chromedp.Evaluate(`document.querySelectorAll('.katex-inline .katex').length`, &katexSpanCount),
+		// Check if KaTeX rendered HTML (contains .katex class with actual content)
+		chromedp.Evaluate(`document.querySelector('.katex-inline .katex-html') !== null`, &hasKatexHTML),
+		// Get sample rendered HTML
+		chromedp.Evaluate(`document.querySelector('.katex-inline')?.innerHTML.substring(0, 300) || ''`, &katexSampleHTML),
+	)
+
+	if err != nil {
+		t.Fatalf("chromedp failed: %v", err)
+	}
+
+	if katexSpanCount < 3 {
+		t.Errorf("expected at least 3 rendered inline math expressions, got %d", katexSpanCount)
+	}
+
+	if !hasKatexHTML {
+		t.Error("KaTeX did not render math to HTML (no .katex-html element found)")
+	}
+
+	if katexSampleHTML == "" {
+		t.Error("KaTeX rendered content is empty")
+	} else {
+		t.Logf("KaTeX inline math rendered (first 300 chars): %s", katexSampleHTML)
+	}
+}
+
+// TestBrowserKatexDisplayMath verifies display math ($$...$$) renders correctly.
+func TestBrowserKatexDisplayMath(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	mathContent := `# Display Math Test
+
+Here is Euler's identity:
+
+$$e^{i\pi} + 1 = 0$$
+
+And the integral of a Gaussian:
+
+$$\int_{-\infty}^{\infty} e^{-x^2} dx = \sqrt{\pi}$$
+
+The Schrödinger equation:
+
+$$i\hbar\frac{\partial}{\partial t}\Psi = \hat{H}\Psi$$
+`
+
+	createTestTab(t, baseURL, "Display Math", "markdown", mathContent)
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var katexDisplayCount int
+	var hasKatexHTML bool
+	var katexSampleHTML string
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible(`.content-markdown`, chromedp.ByQuery),
+		chromedp.Sleep(1*time.Second),
+		// Count katex-display spans that have been rendered
+		chromedp.Evaluate(`document.querySelectorAll('.katex-display .katex').length`, &katexDisplayCount),
+		// Check if KaTeX rendered HTML
+		chromedp.Evaluate(`document.querySelector('.katex-display .katex-html') !== null`, &hasKatexHTML),
+		// Get sample rendered HTML
+		chromedp.Evaluate(`document.querySelector('.katex-display')?.innerHTML.substring(0, 300) || ''`, &katexSampleHTML),
+	)
+
+	if err != nil {
+		t.Fatalf("chromedp failed: %v", err)
+	}
+
+	if katexDisplayCount < 3 {
+		t.Errorf("expected at least 3 rendered display math expressions, got %d", katexDisplayCount)
+	}
+
+	if !hasKatexHTML {
+		t.Error("KaTeX did not render display math to HTML")
+	}
+
+	if katexSampleHTML == "" {
+		t.Error("KaTeX display rendered content is empty")
+	} else {
+		t.Logf("KaTeX display math rendered (first 300 chars): %s", katexSampleHTML)
+	}
+}
+
+// TestBrowserKatexMixedContent verifies math renders alongside other markdown.
+func TestBrowserKatexMixedContent(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	mixedContent := `# Mixed Content Test
+
+This document has **bold text**, *italic text*, and math like $a^2 + b^2 = c^2$.
+
+## Code and Math
+
+Here's some code:
+
+` + "```python" + `
+def quadratic(a, b, c):
+    return (-b + sqrt(b**2 - 4*a*c)) / (2*a)
+` + "```" + `
+
+And the formula it implements: $$x = \frac{-b + \sqrt{b^2 - 4ac}}{2a}$$
+
+## Lists with Math
+
+- Item with math: $\sum_{i=1}^{n} i = \frac{n(n+1)}{2}$
+- Another item: $\prod_{i=1}^{n} i = n!$
+
+Regular text to end.
+`
+
+	createTestTab(t, baseURL, "Mixed Content", "markdown", mixedContent)
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var hasCodeBlock bool
+	var hasInlineMath bool
+	var hasDisplayMath bool
+	var hasBoldText bool
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible(`.content-markdown`, chromedp.ByQuery),
+		chromedp.Sleep(1*time.Second),
+		// Check code block rendered
+		chromedp.Evaluate(`document.querySelector('pre code.hljs') !== null`, &hasCodeBlock),
+		// Check inline math rendered
+		chromedp.Evaluate(`document.querySelector('.katex-inline .katex') !== null`, &hasInlineMath),
+		// Check display math rendered
+		chromedp.Evaluate(`document.querySelector('.katex-display .katex') !== null`, &hasDisplayMath),
+		// Check bold text rendered
+		chromedp.Evaluate(`document.querySelector('strong') !== null`, &hasBoldText),
+	)
+
+	if err != nil {
+		t.Fatalf("chromedp failed: %v", err)
+	}
+
+	if !hasCodeBlock {
+		t.Error("code block not rendered in mixed content")
+	}
+
+	if !hasInlineMath {
+		t.Error("inline math not rendered in mixed content")
+	}
+
+	if !hasDisplayMath {
+		t.Error("display math not rendered in mixed content")
+	}
+
+	if !hasBoldText {
+		t.Error("bold text not rendered in mixed content")
+	}
+}
+
+// TestBrowserKatexErrorHandling verifies invalid math is handled gracefully.
+func TestBrowserKatexErrorHandling(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	invalidMathContent := `# Error Handling Test
+
+Here's valid math: $x^2$
+
+Here's invalid math: $\invalidcommand{broken}$
+
+And another valid one: $y = mx + b$
+
+Invalid display math:
+
+$$\begin{invalid}
+not a real environment
+\end{invalid}$$
+`
+
+	createTestTab(t, baseURL, "Error Test", "markdown", invalidMathContent)
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var hasRenderedMath bool
+	var katexSpanCount int
+	var pageNotCrashed bool
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible(`.content-markdown`, chromedp.ByQuery),
+		chromedp.Sleep(1*time.Second),
+		// Check that valid math still rendered
+		chromedp.Evaluate(`document.querySelector('.katex-inline .katex') !== null`, &hasRenderedMath),
+		// Count rendered spans (should have some, even with errors)
+		chromedp.Evaluate(`document.querySelectorAll('.katex-inline, .katex-display').length`, &katexSpanCount),
+		// Check page didn't crash (h1 still exists)
+		chromedp.Evaluate(`document.querySelector('h1') !== null`, &pageNotCrashed),
+	)
+
+	if err != nil {
+		t.Fatalf("chromedp failed: %v", err)
+	}
+
+	if !pageNotCrashed {
+		t.Error("page appears to have crashed (no h1 found)")
+	}
+
+	if !hasRenderedMath {
+		t.Error("valid math expressions did not render despite invalid ones present")
+	}
+
+	// We expect 4 math spans: 3 inline + 1 display (some may show errors, that's OK)
+	if katexSpanCount < 4 {
+		t.Errorf("expected at least 4 math spans (including error cases), got %d", katexSpanCount)
+	}
+
+	t.Logf("KaTeX error handling: page stable, %d math spans found", katexSpanCount)
+}

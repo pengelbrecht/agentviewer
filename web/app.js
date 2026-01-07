@@ -397,50 +397,89 @@
 
                     const langClass = lang ? `language-${escapeHtml(lang)}` : '';
                     return `<pre><code class="hljs ${langClass}">${highlighted}</code></pre>`;
-                },
-
-                // Handle paragraphs for math detection
-                paragraph(token) {
-                    // Get the text from the token
-                    let text = this.parser.parseInline(token.tokens);
-
-                    // Replace display math: $$...$$
-                    text = text.replace(/\$\$([^$]+)\$\$/g, '<span class="katex-display">$1</span>');
-                    // Replace inline math: $...$
-                    text = text.replace(/\$([^$\n]+)\$/g, '<span class="katex-inline">$1</span>');
-
-                    return `<p>${text}</p>\n`;
                 }
             }
         });
     }
 
-    // Render markdown using marked.js
-    function renderMarkdown(content) {
-        if (typeof marked !== 'undefined') {
-            configureMarked();
-            return marked.parse(content);
+    // Extract and protect math expressions before markdown processing
+    // Returns { content: processed content, mathMap: map of placeholders to math }
+    function extractMathExpressions(content) {
+        const mathMap = {};
+        let counter = 0;
+
+        // Don't process if no $ signs present
+        if (!content.includes('$')) {
+            return { content: content, mathMap: mathMap };
         }
 
-        // Fallback: basic markdown rendering
-        let html = escapeHtml(content);
+        // Extract display math: $$...$$ (can be multiline)
+        content = content.replace(/\$\$([\s\S]+?)\$\$/g, function(match, math) {
+            const placeholder = `%%%MATH_DISPLAY_${counter}%%%`;
+            mathMap[placeholder] = { math: math.trim(), display: true };
+            counter++;
+            return placeholder;
+        });
 
-        // Headers
-        html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-        html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-        html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+        // Extract inline math: $...$ (not greedy, no newlines)
+        // Use negative lookbehind/lookahead to avoid matching $$
+        content = content.replace(/(?<!\$)\$(?!\$)([^\$\n]+?)\$(?!\$)/g, function(match, math) {
+            // Skip if math content has spaces on both ends (likely not math)
+            if (/^\s|\s$/.test(math)) {
+                return match;
+            }
+            const placeholder = `%%%MATH_INLINE_${counter}%%%`;
+            mathMap[placeholder] = { math: math, display: false };
+            counter++;
+            return placeholder;
+        });
 
-        // Bold and italic
-        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+        return { content: content, mathMap: mathMap };
+    }
 
-        // Code blocks
-        html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>');
-        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // Restore math expressions as KaTeX-ready spans
+    function restoreMathExpressions(html, mathMap) {
+        for (const [placeholder, data] of Object.entries(mathMap)) {
+            const className = data.display ? 'katex-display' : 'katex-inline';
+            const escaped = escapeHtml(data.math);
+            html = html.replace(placeholder, `<span class="${className}">${escaped}</span>`);
+        }
+        return html;
+    }
 
-        // Line breaks
-        html = html.replace(/\n\n/g, '</p><p>');
-        html = '<p>' + html + '</p>';
+    // Render markdown using marked.js
+    function renderMarkdown(content) {
+        // Extract math expressions before markdown processing
+        const { content: processedContent, mathMap } = extractMathExpressions(content);
+
+        let html;
+        if (typeof marked !== 'undefined') {
+            configureMarked();
+            html = marked.parse(processedContent);
+        } else {
+            // Fallback: basic markdown rendering
+            html = escapeHtml(processedContent);
+
+            // Headers
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+            // Bold and italic
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+            // Code blocks
+            html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>');
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+            // Line breaks
+            html = html.replace(/\n\n/g, '</p><p>');
+            html = '<p>' + html + '</p>';
+        }
+
+        // Restore math expressions as KaTeX-ready spans
+        html = restoreMathExpressions(html, mathMap);
 
         return html;
     }
