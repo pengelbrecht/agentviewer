@@ -1,0 +1,108 @@
+diff --git a/config.go b/config.go
+new file mode 100644
+index 0000000..a1b2c3d
+--- /dev/null
++++ b/config.go
+@@ -0,0 +1,45 @@
++package main
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++)
++
++// Config holds application configuration
++type Config struct {
++	Port       int    `json:"port"`
++	Host       string `json:"host"`
++	OpenBrowser bool   `json:"open_browser"`
++	Theme      string `json:"theme"`
++}
++
++// DefaultConfig returns sensible defaults
++func DefaultConfig() *Config {
++	return &Config{
++		Port:       8080,
++		Host:       "localhost",
++		OpenBrowser: true,
++		Theme:      "auto",
++	}
++}
++
++// LoadConfig reads configuration from file
++func LoadConfig(path string) (*Config, error) {
++	cfg := DefaultConfig()
++
++	data, err := os.ReadFile(path)
++	if err != nil {
++		if os.IsNotExist(err) {
++			return cfg, nil
++		}
++		return nil, err
++	}
++
++	if err := json.Unmarshal(data, cfg); err != nil {
++		return nil, err
++	}
++
++	return cfg, nil
++}
+diff --git a/main.go b/main.go
+index def1234..abc5678 100644
+--- a/main.go
++++ b/main.go
+@@ -1,18 +1,25 @@
+ package main
+
+ import (
+-	"flag"
+ 	"fmt"
+-	"log"
++	"os"
++
++	"github.com/spf13/cobra"
+ )
+
+ func main() {
+-	port := flag.Int("port", 8080, "port to listen on")
+-	flag.Parse()
++	rootCmd := &cobra.Command{
++		Use:   "agentviewer",
++		Short: "Rich content viewer for AI agents",
++	}
+
+-	srv := NewServer()
+-	addr := fmt.Sprintf(":%d", *port)
+-	log.Printf("Starting server on %s", addr)
+-	log.Fatal(srv.ListenAndServe(addr))
++	rootCmd.AddCommand(serveCmd())
++	rootCmd.AddCommand(versionCmd())
++
++	if err := rootCmd.Execute(); err != nil {
++		fmt.Fprintln(os.Stderr, err)
++		os.Exit(1)
++	}
+ }
+diff --git a/server.go b/server.go
+index 111aaaa..222bbbb 100644
+--- a/server.go
++++ b/server.go
+@@ -15,6 +15,7 @@ type Server struct {
+ 	state  *State
+ 	hub    *Hub
+ 	mux    *http.ServeMux
++	config *Config
+ }
+
+-func NewServer() *Server {
++func NewServer(cfg *Config) *Server {
+ 	s := &Server{
+ 		state: NewState(),
+ 		hub:   NewHub(),
+ 		mux:   http.NewServeMux(),
++		config: cfg,
+ 	}
+ 	s.setupRoutes()
+ 	return s
+ }

@@ -1,0 +1,61 @@
+diff --git a/api/routes.go b/api/routes.go
+index abc1234..def5678 100644
+--- a/api/routes.go
++++ b/api/routes.go
+@@ -1,10 +1,12 @@
+ package api
+
+ import (
++	"context"
+ 	"net/http"
+
+ 	"github.com/go-chi/chi/v5"
+ 	"github.com/go-chi/chi/v5/middleware"
++	"github.com/go-chi/cors"
+ )
+
+ func NewRouter() *chi.Mux {
+@@ -15,6 +17,16 @@ func NewRouter() *chi.Mux {
+ 	r.Use(middleware.RealIP)
+ 	r.Use(middleware.Logger)
+ 	r.Use(middleware.Recoverer)
++	r.Use(cors.Handler(cors.Options{
++		AllowedOrigins:   []string{"https://*", "http://*"},
++		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
++		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
++		ExposedHeaders:   []string{"Link"},
++		AllowCredentials: true,
++		MaxAge:           300,
++	}))
++
++	r.Use(contextTimeout)
+
+ 	return r
+ }
+@@ -35,6 +47,14 @@ func SetupRoutes(r *chi.Mux, h *Handlers) {
+ 	r.Route("/api/v1", func(r chi.Router) {
+ 		r.Get("/health", h.HealthCheck)
+
++		// Authentication routes
++		r.Route("/auth", func(r chi.Router) {
++			r.Post("/login", h.Login)
++			r.Post("/logout", h.Logout)
++			r.Post("/refresh", h.RefreshToken)
++			r.Get("/me", h.GetCurrentUser)
++		})
++
+ 		// User routes
+ 		r.Route("/users", func(r chi.Router) {
+ 			r.Get("/", h.ListUsers)
+@@ -54,3 +74,10 @@ func SetupRoutes(r *chi.Mux, h *Handlers) {
+ 		})
+ 	})
+ }
++
++func contextTimeout(next http.Handler) http.Handler {
++	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
++		defer cancel()
++		next.ServeHTTP(w, r.WithContext(ctx))
++	})
++}

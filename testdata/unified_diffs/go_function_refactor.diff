@@ -1,0 +1,57 @@
+diff --git a/handlers.go b/handlers.go
+index abc1234..def5678 100644
+--- a/handlers.go
++++ b/handlers.go
+@@ -10,22 +10,35 @@ import (
+ 	"net/http"
+ )
+
+-func handleCreateTab(w http.ResponseWriter, r *http.Request) {
++// TabHandler handles tab-related HTTP requests
++type TabHandler struct {
++	state *State
++	hub   *Hub
++}
++
++// NewTabHandler creates a new tab handler
++func NewTabHandler(state *State, hub *Hub) *TabHandler {
++	return &TabHandler{state: state, hub: hub}
++}
++
++// CreateTab handles POST /api/tabs
++func (h *TabHandler) CreateTab(w http.ResponseWriter, r *http.Request) {
+ 	var req TabRequest
+ 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+ 		http.Error(w, err.Error(), http.StatusBadRequest)
+ 		return
+ 	}
+
+-	tab := createTab(req)
+-	state.Lock()
+-	state.tabs[tab.ID] = tab
+-	state.Unlock()
++	tab := h.createTabFromRequest(req)
++	h.state.AddTab(tab)
+
+-	broadcastTabCreated(tab)
++	h.hub.Broadcast(WSMessage{
++		Type: "tab.created",
++		Tab:  tab,
++	})
+
+ 	w.Header().Set("Content-Type", "application/json")
+ 	json.NewEncoder(w).Encode(tab)
+ }
+
+-func handleGetTab(w http.ResponseWriter, r *http.Request) {
+-	id := r.PathValue("id")
+-	state.RLock()
+-	tab, ok := state.tabs[id]
+-	state.RUnlock()
++// GetTab handles GET /api/tabs/{id}
++func (h *TabHandler) GetTab(w http.ResponseWriter, r *http.Request) {
++	id := chi.URLParam(r, "id")
++	tab, ok := h.state.GetTab(id)
+
+ 	if !ok {
+ 		http.Error(w, "tab not found", http.StatusNotFound)

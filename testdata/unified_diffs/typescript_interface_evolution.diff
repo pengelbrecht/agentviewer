@@ -1,0 +1,90 @@
+diff --git a/src/types/api.ts b/src/types/api.ts
+index 1234567..89abcde 100644
+--- a/src/types/api.ts
++++ b/src/types/api.ts
+@@ -1,20 +1,65 @@
+-interface User {
+-  id: string;
+-  name: string;
+-  email: string;
+-}
++/**
++ * API Types for the application
++ * Version 2.0 - Added authentication and roles
++ */
+
+-interface ApiResponse {
+-  data: any;
+-  error?: string;
++// Base types
++type UUID = `${string}-${string}-${string}-${string}-${string}`;
++type ISO8601 = string;
++
++// User roles enum
++const UserRole = {
++  ADMIN: 'admin',
++  EDITOR: 'editor',
++  VIEWER: 'viewer',
++} as const;
++
++type UserRoleType = typeof UserRole[keyof typeof UserRole];
++
++// User interface with full details
++interface User {
++  readonly id: UUID;
++  name: string;
++  email: string;
++  role: UserRoleType;
++  avatar?: string;
++  metadata: UserMetadata;
++  createdAt: ISO8601;
++  updatedAt: ISO8601;
+ }
+
+-async function fetchUser(id: string): Promise<User> {
+-  const response = await fetch(`/api/users/${id}`);
+-  return response.json();
++interface UserMetadata {
++  lastLogin?: ISO8601;
++  loginCount: number;
++  preferences: UserPreferences;
+ }
+
+-async function createUser(user: User): Promise<User> {
+-  const response = await fetch('/api/users', {
+-    method: 'POST',
+-    body: JSON.stringify(user),
+-  });
+-  return response.json();
++interface UserPreferences {
++  theme: 'light' | 'dark' | 'system';
++  notifications: boolean;
++  language: string;
++}
++
++// Generic API response wrapper
++interface ApiResponse<T> {
++  data: T;
++  meta: {
++    requestId: UUID;
++    timestamp: ISO8601;
++    version: string;
++  };
++  error?: ApiError;
++}
++
++interface ApiError {
++  code: string;
++  message: string;
++  details?: Record<string, unknown>;
++}
++
++// Pagination support
++interface PaginatedResponse<T> extends ApiResponse<T[]> {
++  pagination: {
++    page: number;
++    pageSize: number;
++    total: number;
++    totalPages: number;
++  };
+ }

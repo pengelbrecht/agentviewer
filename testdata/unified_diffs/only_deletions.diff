@@ -1,0 +1,67 @@
+--- a/src/deprecated/OldModule.ts
++++ /dev/null
+@@ -1,65 +0,0 @@
+-/**
+- * @deprecated This module is deprecated and will be removed in v3.0
+- * Use NewModule instead
+- */
+-
+-import { Logger } from '../utils/logger';
+-
+-export class OldModule {
+-  private logger: Logger;
+-  private data: Map<string, unknown>;
+-
+-  constructor() {
+-    this.logger = new Logger('OldModule');
+-    this.data = new Map();
+-    this.logger.warn('OldModule is deprecated, migrate to NewModule');
+-  }
+-
+-  /**
+-   * @deprecated Use NewModule.process() instead
+-   */
+-  public processData(input: string): string {
+-    this.logger.debug('Processing data with deprecated method');
+-    return input.toUpperCase();
+-  }
+-
+-  /**
+-   * @deprecated Use NewModule.store() instead
+-   */
+-  public storeValue(key: string, value: unknown): void {
+-    this.data.set(key, value);
+-  }
+-
+-  /**
+-   * @deprecated Use NewModule.retrieve() instead
+-   */
+-  public retrieveValue(key: string): unknown {
+-    return this.data.get(key);
+-  }
+-
+-  /**
+-   * @deprecated Use NewModule.clear() instead
+-   */
+-  public clearAll(): void {
+-    this.data.clear();
+-  }
+-
+-  /**
+-   * Legacy compatibility method
+-   * @deprecated No replacement - use new API patterns
+-   */
+-  public legacyOperation(callback: (result: string) => void): void {
+-    setTimeout(() => {
+-      callback('legacy result');
+-    }, 100);
+-  }
+-
+-  /**
+-   * @deprecated Cleanup resources
+-   */
+-  public dispose(): void {
+-    this.data.clear();
+-    this.logger.info('OldModule disposed');
+-  }
+-}

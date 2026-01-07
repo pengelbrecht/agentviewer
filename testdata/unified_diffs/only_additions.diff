@@ -1,0 +1,51 @@
+--- /dev/null
++++ b/src/components/NewFeature.tsx
+@@ -0,0 +1,48 @@
++import React, { useState, useEffect } from 'react';
++import { useQuery } from '@tanstack/react-query';
++import { fetchFeatureData } from '../api';
++
++interface FeatureProps {
++  featureId: string;
++  onComplete?: () => void;
++}
++
++export function NewFeature({ featureId, onComplete }: FeatureProps) {
++  const [isEnabled, setIsEnabled] = useState(false);
++
++  const { data, isLoading, error } = useQuery({
++    queryKey: ['feature', featureId],
++    queryFn: () => fetchFeatureData(featureId),
++  });
++
++  useEffect(() => {
++    if (data?.enabled) {
++      setIsEnabled(true);
++    }
++  }, [data]);
++
++  if (isLoading) {
++    return <div className="loading">Loading feature...</div>;
++  }
++
++  if (error) {
++    return <div className="error">Failed to load feature</div>;
++  }
++
++  return (
++    <div className="feature-container">
++      <h2>{data?.title}</h2>
++      <p>{data?.description}</p>
++
++      <button
++        onClick={() => {
++          setIsEnabled(!isEnabled);
++          onComplete?.();
++        }}
++        className={isEnabled ? 'active' : ''}
++      >
++        {isEnabled ? 'Disable' : 'Enable'} Feature
++      </button>
++    </div>
++  );
++}

@@ -1,0 +1,25 @@
+diff --git a/assets/logo.png b/assets/logo.png
+index 1234567..89abcde 100644
+Binary files a/assets/logo.png and b/assets/logo.png differ
+diff --git a/src/utils.ts b/src/utils.ts
+index aaaaaaa..bbbbbbb 100644
+--- a/src/utils.ts
++++ b/src/utils.ts
+@@ -1,10 +1,15 @@
+ export function formatDate(date: Date): string {
+-  return date.toISOString();
++  return new Intl.DateTimeFormat('en-US', {
++    year: 'numeric',
++    month: 'long',
++    day: 'numeric',
++  }).format(date);
+ }
+
+-export function capitalize(str: string): string {
+-  return str.charAt(0).toUpperCase() + str.slice(1);
++export function capitalize(str: string, allWords = false): string {
++  if (allWords) {
++    return str.split(' ').map(word => capitalize(word)).join(' ');
++  }
++  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+ }

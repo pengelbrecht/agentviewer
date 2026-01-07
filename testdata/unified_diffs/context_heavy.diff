@@ -1,0 +1,37 @@
+--- a/server/middleware/auth.ts
++++ b/server/middleware/auth.ts
+@@ -15,7 +15,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'development-secret';
+ const TOKEN_EXPIRY = '24h';
+
+ interface TokenPayload {
+-  userId: number;
++  userId: string;
+   email: string;
+   role: UserRole;
+   iat: number;
+@@ -45,7 +45,7 @@ export async function verifyToken(token: string): Promise<TokenPayload> {
+ export const authMiddleware: RequestHandler = async (req, res, next) => {
+   try {
+     const authHeader = req.headers.authorization;
+-
++
+     if (!authHeader) {
+       return res.status(401).json({ error: 'No authorization header' });
+     }
+@@ -57,7 +57,7 @@ export const authMiddleware: RequestHandler = async (req, res, next) => {
+     const token = authHeader.split(' ')[1];
+     const payload = await verifyToken(token);
+-
++
+     // Attach user info to request
+     req.user = {
+       id: payload.userId,
+@@ -85,7 +85,7 @@ export function requireRole(...roles: UserRole[]): RequestHandler {
+       return res.status(401).json({ error: 'Not authenticated' });
+     }
+
+-    if (!roles.includes(req.user.role)) {
++    if (!roles.includes(req.user.role as UserRole)) {
+       logger.warn(`Access denied for user ${req.user.id} - required roles: ${roles.join(', ')}`);
+       return res.status(403).json({ error: 'Insufficient permissions' });
+     }

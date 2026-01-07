@@ -1,0 +1,88 @@
+diff --git a/src/components/DataTable.tsx b/src/components/DataTable.tsx
+index aaa1111..bbb2222 100644
+--- a/src/components/DataTable.tsx
++++ b/src/components/DataTable.tsx
+@@ -1,15 +1,25 @@
+-import React from 'react';
++import React, { useState, useCallback, useMemo } from 'react';
++import { useVirtualizer } from '@tanstack/react-virtual';
++import { SortIcon, FilterIcon } from './icons';
+
+-interface Props {
+-  data: any[];
+-  columns: string[];
++interface Column<T> {
++  key: keyof T;
++  header: string;
++  width?: number;
++  sortable?: boolean;
++  render?: (value: T[keyof T], row: T) => React.ReactNode;
+ }
+
+-export function DataTable({ data, columns }: Props) {
++interface Props<T> {
++  data: T[];
++  columns: Column<T>[];
++  rowHeight?: number;
++  onRowClick?: (row: T) => void;
++}
++
++export function DataTable<T extends { id: string | number }>({
++  data,
++  columns,
++  rowHeight = 48,
++  onRowClick,
++}: Props<T>) {
++  const [sortColumn, setSortColumn] = useState<keyof T | null>(null);
++  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
++
+   return (
+     <table>
+       <thead>
+@@ -25,12 +35,48 @@ export function DataTable({ data, columns }: Props) {
+       </tbody>
+     </table>
+   );
+ }
+@@ -45,6 +91,45 @@ export function DataTable({ data, columns }: Props) {
+     </table>
+   );
+ }
++
++// Add sorting functionality
++const sortedData = useMemo(() => {
++  if (!sortColumn) return data;
++
++  return [...data].sort((a, b) => {
++    const aVal = a[sortColumn];
++    const bVal = b[sortColumn];
++
++    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
++    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
++    return 0;
++  });
++}, [data, sortColumn, sortDirection]);
++
++// Virtual scrolling for large datasets
++const parentRef = React.useRef<HTMLDivElement>(null);
++
++const rowVirtualizer = useVirtualizer({
++  count: sortedData.length,
++  getScrollElement: () => parentRef.current,
++  estimateSize: () => rowHeight,
++  overscan: 5,
++});
++
++const handleSort = useCallback((column: keyof T) => {
++  if (sortColumn === column) {
++    setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
++  } else {
++    setSortColumn(column);
++    setSortDirection('asc');
++  }
++}, [sortColumn]);
++
++const virtualRows = rowVirtualizer.getVirtualItems();
++const totalSize = rowVirtualizer.getTotalSize();
++
++// Render with virtualization...

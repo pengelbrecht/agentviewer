@@ -1,0 +1,84 @@
+--- a/models/user.py
++++ b/models/user.py
+@@ -1,28 +1,52 @@
+-from datetime import datetime
++from datetime import datetime, timezone
++from typing import Optional
++from dataclasses import dataclass, field
++from enum import Enum
++import hashlib
+
+
+-class User:
+-    def __init__(self, name, email):
+-        self.name = name
+-        self.email = email
+-        self.created_at = datetime.now()
++class UserRole(Enum):
++    ADMIN = "admin"
++    USER = "user"
++    GUEST = "guest"
+
+-    def get_display_name(self):
+-        return self.name
+
+-    def to_dict(self):
+-        return {
+-            "name": self.name,
+-            "email": self.email,
+-            "created_at": self.created_at.isoformat()
+-        }
++@dataclass
++class User:
++    """Represents a user in the system."""
++
++    name: str
++    email: str
++    role: UserRole = UserRole.USER
++    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
++    last_login: Optional[datetime] = None
++    is_active: bool = True
++
++    def __post_init__(self):
++        self.email = self.email.lower().strip()
++
++    @property
++    def display_name(self) -> str:
++        """Return formatted display name."""
++        return self.name.title()
++
++    @property
++    def gravatar_url(self) -> str:
++        """Generate Gravatar URL from email hash."""
++        email_hash = hashlib.md5(self.email.encode()).hexdigest()
++        return f"https://gravatar.com/avatar/{email_hash}"
++
++    def to_dict(self) -> dict:
++        """Serialize user to dictionary."""
++        return {
++            "name": self.name,
++            "display_name": self.display_name,
++            "email": self.email,
++            "role": self.role.value,
++            "gravatar_url": self.gravatar_url,
++            "created_at": self.created_at.isoformat(),
++            "last_login": self.last_login.isoformat() if self.last_login else None,
++            "is_active": self.is_active,
++        }
+
+-    @staticmethod
+-    def from_dict(data):
+-        user = User(data["name"], data["email"])
+-        user.created_at = datetime.fromisoformat(data["created_at"])
+-        return user
++    @classmethod
++    def from_dict(cls, data: dict) -> "User":
++        """Deserialize user from dictionary."""
++        return cls(
++            name=data["name"],
++            email=data["email"],
++            role=UserRole(data.get("role", "user")),
++            created_at=datetime.fromisoformat(data["created_at"]),
++            last_login=datetime.fromisoformat(data["last_login"]) if data.get("last_login") else None,
++            is_active=data.get("is_active", True),
++        )

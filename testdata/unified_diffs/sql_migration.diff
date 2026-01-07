@@ -1,0 +1,84 @@
+--- a/migrations/001_initial.sql
++++ b/migrations/002_add_audit_and_roles.sql
+@@ -1,20 +1,72 @@
+--- Initial schema
++-- Migration: Add audit trail and role-based access
+
+-CREATE TABLE users (
+-    id SERIAL PRIMARY KEY,
+-    name VARCHAR(100) NOT NULL,
+-    email VARCHAR(255) UNIQUE NOT NULL,
+-    created_at TIMESTAMP DEFAULT NOW()
+-);
++-- Create roles enum type
++DO $$ BEGIN
++    CREATE TYPE user_role AS ENUM ('admin', 'editor', 'viewer', 'guest');
++EXCEPTION
++    WHEN duplicate_object THEN null;
++END $$;
+
+-CREATE TABLE posts (
+-    id SERIAL PRIMARY KEY,
+-    user_id INTEGER REFERENCES users(id),
+-    title VARCHAR(200) NOT NULL,
+-    content TEXT,
+-    created_at TIMESTAMP DEFAULT NOW()
+-);
++-- Add role column to users
++ALTER TABLE users
++ADD COLUMN IF NOT EXISTS role user_role DEFAULT 'viewer',
++ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
++ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP,
++ADD COLUMN IF NOT EXISTS last_login TIMESTAMP;
+
+-CREATE INDEX idx_posts_user_id ON posts(user_id);
++-- Create audit log table
++CREATE TABLE IF NOT EXISTS audit_log (
++    id BIGSERIAL PRIMARY KEY,
++    table_name VARCHAR(100) NOT NULL,
++    record_id INTEGER NOT NULL,
++    action VARCHAR(20) NOT NULL CHECK (action IN ('INSERT', 'UPDATE', 'DELETE')),
++    old_data JSONB,
++    new_data JSONB,
++    user_id INTEGER REFERENCES users(id),
++    ip_address INET,
++    user_agent TEXT,
++    created_at TIMESTAMP DEFAULT NOW()
++);
++
++-- Create indexes for audit log
++CREATE INDEX IF NOT EXISTS idx_audit_log_table ON audit_log(table_name);
++CREATE INDEX IF NOT EXISTS idx_audit_log_record ON audit_log(table_name, record_id);
++CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id);
++CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at DESC);
++
++-- Audit trigger function
++CREATE OR REPLACE FUNCTION audit_trigger_func()
++RETURNS TRIGGER AS $$
++BEGIN
++    IF TG_OP = 'DELETE' THEN
++        INSERT INTO audit_log (table_name, record_id, action, old_data, user_id)
++        VALUES (TG_TABLE_NAME, OLD.id, TG_OP, to_jsonb(OLD), current_setting('app.user_id', true)::int);
++        RETURN OLD;
++    ELSIF TG_OP = 'UPDATE' THEN
++        INSERT INTO audit_log (table_name, record_id, action, old_data, new_data, user_id)
++        VALUES (TG_TABLE_NAME, NEW.id, TG_OP, to_jsonb(OLD), to_jsonb(NEW), current_setting('app.user_id', true)::int);
++        RETURN NEW;
++    ELSIF TG_OP = 'INSERT' THEN
++        INSERT INTO audit_log (table_name, record_id, action, new_data, user_id)
++        VALUES (TG_TABLE_NAME, NEW.id, TG_OP, to_jsonb(NEW), current_setting('app.user_id', true)::int);
++        RETURN NEW;
++    END IF;
++    RETURN NULL;
++END;
++$$ LANGUAGE plpgsql;
++
++-- Apply audit trigger to users table
++DROP TRIGGER IF EXISTS users_audit_trigger ON users;
++CREATE TRIGGER users_audit_trigger
++    AFTER INSERT OR UPDATE OR DELETE ON users
++    FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
+
+-CREATE INDEX idx_posts_created_at ON posts(created_at DESC);
++-- Soft delete support
++CREATE INDEX IF NOT EXISTS idx_users_active ON users(id) WHERE deleted_at IS NULL;

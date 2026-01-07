@@ -1,0 +1,60 @@
+diff --git a/src/utils/helpers.ts b/src/lib/utils.ts
+similarity index 75%
+rename from src/utils/helpers.ts
+rename to src/lib/utils.ts
+index 1111111..2222222 100644
+--- a/src/utils/helpers.ts
++++ b/src/lib/utils.ts
+@@ -1,20 +1,35 @@
+-// Helper utilities
++/**
++ * Core utility functions
++ * @module lib/utils
++ */
+
+-export function debounce(fn: Function, delay: number) {
+-  let timer: NodeJS.Timeout;
++type AnyFunction = (...args: unknown[]) => unknown;
++
++/**
++ * Creates a debounced function that delays invoking fn
++ */
++export function debounce<T extends AnyFunction>(
++  fn: T,
++  delay: number
++): (...args: Parameters<T>) => void {
++  let timer: ReturnType<typeof setTimeout>;
+
+   return function (...args: unknown[]) {
+     clearTimeout(timer);
+     timer = setTimeout(() => fn(...args), delay);
+   };
+ }
+
+-export function throttle(fn: Function, limit: number) {
+-  let inThrottle: boolean;
++/**
++ * Creates a throttled function that only invokes fn at most once per limit
++ */
++export function throttle<T extends AnyFunction>(
++  fn: T,
++  limit: number
++): (...args: Parameters<T>) => void {
++  let inThrottle = false;
+
+-  return function (...args: unknown[]) {
++  return function (...args: Parameters<T>) {
+     if (!inThrottle) {
+       fn(...args);
+       inThrottle = true;
+       setTimeout(() => (inThrottle = false), limit);
+     }
+   };
+ }
++
++/**
++ * Deep clones an object
++ */
++export function deepClone<T>(obj: T): T {
++  return structuredClone(obj);
++}

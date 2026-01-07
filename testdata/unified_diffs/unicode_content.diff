@@ -1,0 +1,55 @@
+--- a/i18n/messages.json
++++ b/i18n/messages.json
+@@ -1,25 +1,50 @@
+ {
+   "en": {
+-    "greeting": "Hello",
+-    "farewell": "Goodbye"
++    "greeting": "Hello, {name}! 👋",
++    "farewell": "Goodbye, see you soon! 🙌",
++    "welcome": "Welcome to our app ✨",
++    "success": "Operation completed successfully ✅",
++    "error": "Something went wrong ❌"
+   },
+   "es": {
+-    "greeting": "Hola",
+-    "farewell": "Adiós"
++    "greeting": "¡Hola, {name}! 👋",
++    "farewell": "¡Adiós, hasta pronto! 🙌",
++    "welcome": "Bienvenido a nuestra app ✨",
++    "success": "Operación completada con éxito ✅",
++    "error": "Algo salió mal ❌"
+   },
+   "ja": {
+-    "greeting": "こんにちは",
+-    "farewell": "さようなら"
++    "greeting": "こんにちは、{name}さん! 👋",
++    "farewell": "さようなら、またね! 🙌",
++    "welcome": "アプリへようこそ ✨",
++    "success": "操作が正常に完了しました ✅",
++    "error": "エラーが発生しました ❌"
+   },
+   "zh": {
+-    "greeting": "你好",
+-    "farewell": "再见"
++    "greeting": "你好，{name}！👋",
++    "farewell": "再见，下次见！🙌",
++    "welcome": "欢迎使用我们的应用 ✨",
++    "success": "操作成功完成 ✅",
++    "error": "出现错误 ❌"
++  },
++  "ru": {
++    "greeting": "Привет, {name}! 👋",
++    "farewell": "До свидания! 🙌",
++    "welcome": "Добро пожаловать ✨",
++    "success": "Операция успешно завершена ✅",
++    "error": "Что-то пошло не так ❌"
++  },
++  "ar": {
++    "greeting": "مرحبًا، {name}! 👋",
++    "farewell": "مع السلامة! 🙌",
++    "welcome": "مرحبًا بك في تطبيقنا ✨",
++    "success": "تمت العملية بنجاح ✅",
++    "error": "حدث خطأ ما ❌"
+   }
+ }

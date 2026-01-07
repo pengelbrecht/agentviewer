@@ -1,0 +1,33 @@
+diff --git a/scripts/deploy.sh b/scripts/deploy.sh
+old mode 100644
+new mode 100755
+index 1234567..89abcde
+--- a/scripts/deploy.sh
++++ b/scripts/deploy.sh
+@@ -1,10 +1,25 @@
+ #!/bin/bash
++set -euo pipefail
+
+-echo "Deploying..."
+-npm run build
+-scp -r dist/* server:/var/www/html/
+-echo "Done"
++# Configuration
++DEPLOY_HOST="${DEPLOY_HOST:-production.example.com}"
++DEPLOY_PATH="${DEPLOY_PATH:-/var/www/html}"
++BUILD_DIR="dist"
++
++echo "🚀 Starting deployment to ${DEPLOY_HOST}..."
++
++# Build
++echo "📦 Building application..."
++npm ci
++npm run build
++
++# Deploy
++echo "📤 Uploading to ${DEPLOY_HOST}..."
++rsync -avz --delete "${BUILD_DIR}/" "${DEPLOY_HOST}:${DEPLOY_PATH}/"
++
++# Verify
++echo "✅ Deployment complete!"
++curl -sf "https://${DEPLOY_HOST}/health" || echo "⚠️ Health check failed"
