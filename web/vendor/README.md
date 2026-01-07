@@ -1,11 +1,41 @@
 # Vendor Libraries
 
-This directory contains embedded JavaScript libraries for the frontend:
+This directory contains embedded JavaScript libraries for the frontend.
 
-- marked.js - Markdown rendering
-- highlight.js - Syntax highlighting
-- mermaid.js - Diagram rendering
-- katex - Math rendering
-- diff2html - Diff rendering
+## Included Libraries
 
-Libraries will be downloaded and placed here during setup.
+| Library | Version | Purpose |
+|---------|---------|---------|
+| marked.js | 15.0.5 | Markdown rendering |
+| highlight.js | 11.10.0 | Syntax highlighting |
+| mermaid.js | 11.4.1 | Diagram rendering |
+| KaTeX | 0.16.18 | Math rendering |
+| diff2html | 3.4.51 | Diff rendering |
+
+## Files
+
+- `marked.min.js` - Markdown parser
+- `highlight.min.js` - Syntax highlighter core
+- `highlight-github-dark.min.css` - Dark theme for syntax highlighting
+- `mermaid.min.js` - Diagram renderer
+- `katex.min.js` - Math renderer
+- `katex.min.css` - KaTeX styles
+- `katex-fonts/` - KaTeX font files (woff2)
+- `diff2html.min.js` - Diff renderer
+- `diff2html.min.css` - Diff styles
+
+## Usage in HTML
+
+```html
+<!-- CSS -->
+<link rel="stylesheet" href="/vendor/highlight-github-dark.min.css">
+<link rel="stylesheet" href="/vendor/katex.min.css">
+<link rel="stylesheet" href="/vendor/diff2html.min.css">
+
+<!-- JS -->
+<script src="/vendor/marked.min.js"></script>
+<script src="/vendor/highlight.min.js"></script>
+<script src="/vendor/mermaid.min.js"></script>
+<script src="/vendor/katex.min.js"></script>
+<script src="/vendor/diff2html.min.js"></script>
+```

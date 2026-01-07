@@ -64,6 +64,12 @@ func getContentType(filePath string) string {
 		return "image/png"
 	case ".ico":
 		return "image/x-icon"
+	case ".woff2":
+		return "font/woff2"
+	case ".woff":
+		return "font/woff"
+	case ".ttf":
+		return "font/ttf"
 	default:
 		return "application/octet-stream"
 	}
