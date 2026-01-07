@@ -15,6 +15,7 @@ func TestDetectContentType(t *testing.T) {
 		content  string
 		expected TabType
 	}{
+		// File extension based detection
 		{
 			name:     "markdown file",
 			filename: "README.md",
@@ -34,8 +35,20 @@ func TestDetectContentType(t *testing.T) {
 			expected: TabTypeMarkdown,
 		},
 		{
+			name:     "markdown file mixed case extension",
+			filename: "file.Md",
+			content:  "",
+			expected: TabTypeMarkdown,
+		},
+		{
 			name:     "diff file",
 			filename: "changes.diff",
+			content:  "",
+			expected: TabTypeDiff,
+		},
+		{
+			name:     "diff file uppercase",
+			filename: "CHANGES.DIFF",
 			content:  "",
 			expected: TabTypeDiff,
 		},
@@ -45,6 +58,14 @@ func TestDetectContentType(t *testing.T) {
 			content:  "",
 			expected: TabTypeDiff,
 		},
+		{
+			name:     "patch file uppercase",
+			filename: "FIX.PATCH",
+			content:  "",
+			expected: TabTypeDiff,
+		},
+
+		// Code files - extension overrides content
 		{
 			name:     "go source file",
 			filename: "main.go",
@@ -58,7 +79,63 @@ func TestDetectContentType(t *testing.T) {
 			expected: TabTypeCode,
 		},
 		{
-			name:     "diff content without extension",
+			name:     "javascript file",
+			filename: "app.js",
+			content:  "const x = 1;",
+			expected: TabTypeCode,
+		},
+		{
+			name:     "typescript file",
+			filename: "app.ts",
+			content:  "interface Foo {}",
+			expected: TabTypeCode,
+		},
+		{
+			name:     "rust file",
+			filename: "main.rs",
+			content:  "fn main() {}",
+			expected: TabTypeCode,
+		},
+		{
+			name:     "json file",
+			filename: "config.json",
+			content:  `{"key": "value"}`,
+			expected: TabTypeCode,
+		},
+		{
+			name:     "yaml file",
+			filename: "config.yaml",
+			content:  "key: value",
+			expected: TabTypeCode,
+		},
+		{
+			name:     "yml file",
+			filename: "config.yml",
+			content:  "key: value",
+			expected: TabTypeCode,
+		},
+		{
+			name:     "html file",
+			filename: "index.html",
+			content:  "<!DOCTYPE html>",
+			expected: TabTypeCode,
+		},
+		{
+			name:     "css file",
+			filename: "style.css",
+			content:  "body { margin: 0; }",
+			expected: TabTypeCode,
+		},
+		{
+			name:     "shell script",
+			filename: "script.sh",
+			content:  "#!/bin/bash",
+			expected: TabTypeCode,
+		},
+
+		// Content-based detection (no filename)
+		{
+			name:     "diff content without extension - diff prefix",
 			filename: "",
 			content:  "diff --git a/file.go b/file.go",
 			expected: TabTypeDiff,
@@ -76,6 +153,14 @@ func TestDetectContentType(t *testing.T) {
 			expected: TabTypeDiff,
 		},
 		{
+			name:     "diff content with leading whitespace not detected as diff",
+			filename: "",
+			content:  "  diff --git a/file.go b/file.go",
+			expected: TabTypeMarkdown, // HasPrefix fails with leading whitespace
+		},
+
+		// Markdown content patterns
+		{
 			name:     "markdown content by pattern - h1 header",
 			filename: "",
 			content:  "# This is a header",
@@ -88,15 +173,27 @@ func TestDetectContentType(t *testing.T) {
 			expected: TabTypeMarkdown,
 		},
 		{
+			name:     "markdown content by pattern - h3 header",
+			filename: "",
+			content:  "some text\n### Subsection",
+			expected: TabTypeMarkdown,
+		},
+		{
 			name:     "markdown content by pattern - bold",
 			filename: "",
 			content:  "This is **bold** text",
 			expected: TabTypeMarkdown,
 		},
 		{
-			name:     "markdown content by pattern - list",
+			name:     "markdown content by pattern - unordered list",
 			filename: "",
 			content:  "- Item one\n- Item two",
+			expected: TabTypeMarkdown,
+		},
+		{
+			name:     "markdown content by pattern - nested list",
+			filename: "",
+			content:  "- Item one\n  - Nested item",
 			expected: TabTypeMarkdown,
 		},
 		{
@@ -105,6 +202,198 @@ func TestDetectContentType(t *testing.T) {
 			content:  "Just some plain text without any markers",
 			expected: TabTypeMarkdown,
 		},
+		{
+			name:     "empty content defaults to markdown",
+			filename: "",
+			content:  "",
+			expected: TabTypeMarkdown,
+		},
+		{
+			name:     "whitespace only defaults to markdown",
+			filename: "",
+			content:  "   \n\t\n   ",
+			expected: TabTypeMarkdown,
+		},
+
+		// Edge cases - filename takes priority over content
+		{
+			name:     "markdown filename overrides code-like content",
+			filename: "README.md",
+			content:  "package main\nfunc main() {}",
+			expected: TabTypeMarkdown,
+		},
+		{
+			name:     "diff filename overrides markdown content",
+			filename: "changes.diff",
+			content:  "# This looks like markdown",
+			expected: TabTypeDiff,
+		},
+		{
+			name:     "code filename with markdown content",
+			filename: "main.go",
+			content:  "# This is a header",
+			expected: TabTypeCode,
+		},
+		{
+			name:     "code filename with diff-like content",
+			filename: "script.py",
+			content:  "--- old\n+++ new",
+			expected: TabTypeCode,
+		},
+
+		// Unknown extensions - content-based fallback
+		{
+			name:     "unknown extension with diff content",
+			filename: "file.xyz",
+			content:  "diff --git a/b",
+			expected: TabTypeDiff,
+		},
+		{
+			name:     "unknown extension with markdown content",
+			filename: "file.xyz",
+			content:  "# Markdown header",
+			expected: TabTypeMarkdown,
+		},
+		{
+			name:     "unknown extension with plain content",
+			filename: "file.xyz",
+			content:  "Just text",
+			expected: TabTypeMarkdown, // defaults to markdown
+		},
+
+		// Path handling
+		{
+			name:     "full path - markdown",
+			filename: "/path/to/README.md",
+			content:  "",
+			expected: TabTypeMarkdown,
+		},
+		{
+			name:     "full path - code",
+			filename: "/home/user/project/main.go",
+			content:  "",
+			expected: TabTypeCode,
+		},
+		{
+			name:     "full path with dots in directory",
+			filename: "/path/to/.hidden/file.py",
+			content:  "",
+			expected: TabTypeCode,
+		},
+		{
+			name:     "relative path",
+			filename: "./src/main.go",
+			content:  "",
+			expected: TabTypeCode,
+		},
+
+		// Special cases
+		{
+			name:     "Dockerfile detected as code",
+			filename: "Dockerfile",
+			content:  "FROM alpine",
+			expected: TabTypeCode,
+		},
+		{
+			name:     "Makefile detected as code",
+			filename: "Makefile",
+			content:  "all: build",
+			expected: TabTypeCode,
+		},
+		{
+			name:     "gitignore detected as code",
+			filename: ".gitignore",
+			content:  "*.log",
+			expected: TabTypeCode,
+		},
+		{
+			name:     "dockerignore detected as code",
+			filename: ".dockerignore",
+			content:  "node_modules",
+			expected: TabTypeCode,
+		},
+
+		// Unicode content
+		{
+			name:     "markdown with unicode",
+			filename: "",
+			content:  "# 日本語ヘッダー",
+			expected: TabTypeMarkdown,
+		},
+		{
+			name:     "code file with unicode content",
+			filename: "file.go",
+			content:  `const greeting = "こんにちは"`,
+			expected: TabTypeCode,
+		},
+
+		// Multi-line content detection
+		{
+			name:     "markdown header on second line",
+			filename: "",
+			content:  "Some intro text\n# Main Header",
+			expected: TabTypeMarkdown,
+		},
+		{
+			name:     "diff marker on second line not detected",
+			filename: "",
+			content:  "Description\ndiff --git a/b",
+			expected: TabTypeMarkdown, // HasPrefix only checks start
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := DetectContentType(tt.filename, tt.content)
+			if result != tt.expected {
+				t.Errorf("DetectContentType(%q, %q) = %v, want %v",
+					tt.filename, tt.content, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDetectContentType_ExtensionPriority(t *testing.T) {
+	// Verify that file extension always takes priority over content heuristics
+	// when the extension is recognized
+
+	t.Run("markdown extension beats code content", func(t *testing.T) {
+		result := DetectContentType("README.md", "package main")
+		if result != TabTypeMarkdown {
+			t.Errorf("Expected markdown for .md file, got %v", result)
+		}
+	})
+
+	t.Run("diff extension beats markdown content", func(t *testing.T) {
+		result := DetectContentType("changes.diff", "# Header")
+		if result != TabTypeDiff {
+			t.Errorf("Expected diff for .diff file, got %v", result)
+		}
+	})
+
+	t.Run("code extension beats diff content", func(t *testing.T) {
+		result := DetectContentType("file.go", "--- old\n+++ new")
+		if result != TabTypeCode {
+			t.Errorf("Expected code for .go file, got %v", result)
+		}
+	})
+}
+
+func TestDetectContentType_EmptyAndEdgeCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		content  string
+		expected TabType
+	}{
+		{"both empty", "", "", TabTypeMarkdown},
+		{"empty filename, newlines only", "", "\n\n\n", TabTypeMarkdown},
+		{"just dots in filename", "...", "", TabTypeMarkdown},
+		{"extension only", ".md", "", TabTypeMarkdown},
+		{"no extension with spaces", "README", "", TabTypeMarkdown},
+		{"multiple extensions - last wins", "file.tar.gz", "", TabTypeMarkdown}, // .gz not recognized
+		{"multiple extensions - md wins", "file.backup.md", "", TabTypeMarkdown},
+		{"case insensitive - MARKDOWN", "FILE.MARKDOWN", "", TabTypeMarkdown},
 	}
 
 	for _, tt := range tests {
@@ -208,6 +497,158 @@ func TestDetectLanguage(t *testing.T) {
 			if result != tt.expected {
 				t.Errorf("DetectLanguage(%q, \"\") = %q, want %q",
 					tt.filename, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDetectLanguage_CaseInsensitive(t *testing.T) {
+	// File extensions should be case-insensitive
+	tests := []struct {
+		filename string
+		expected string
+	}{
+		{"FILE.GO", "go"},
+		{"File.Go", "go"},
+		{"SCRIPT.PY", "python"},
+		{"Script.Py", "python"},
+		{"APP.JS", "javascript"},
+		{"Component.JSX", "javascript"},
+		{"Module.TS", "typescript"},
+		{"FILE.JAVA", "java"},
+		{"MAIN.RS", "rust"},
+		{"Config.JSON", "json"},
+		{"Config.YAML", "yaml"},
+		{"Style.CSS", "css"},
+		{"Index.HTML", "html"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.filename, func(t *testing.T) {
+			result := DetectLanguage(tt.filename, "")
+			if result != tt.expected {
+				t.Errorf("DetectLanguage(%q, \"\") = %q, want %q (case insensitive)",
+					tt.filename, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDetectLanguage_SpecialFilenames(t *testing.T) {
+	// Test special filenames that are case-sensitive
+	tests := []struct {
+		filename string
+		expected string
+	}{
+		// Exact matches
+		{"Dockerfile", "dockerfile"},
+		{"Makefile", "makefile"},
+		{".gitignore", "plaintext"},
+		{".dockerignore", "plaintext"},
+		// Case variations should NOT match (special names are case-sensitive in current impl)
+		{"dockerfile", "dockerfile"},
+		{"makefile", "makefile"},
+		// Paths with special filenames
+		{"/path/to/Dockerfile", "dockerfile"},
+		{"./project/Makefile", "makefile"},
+		{"src/.gitignore", "plaintext"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.filename, func(t *testing.T) {
+			result := DetectLanguage(tt.filename, "")
+			if result != tt.expected {
+				t.Errorf("DetectLanguage(%q, \"\") = %q, want %q",
+					tt.filename, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDetectLanguage_Paths(t *testing.T) {
+	// Test that paths are handled correctly (extension from filename only)
+	tests := []struct {
+		filename string
+		expected string
+	}{
+		{"/home/user/project/main.go", "go"},
+		{"./src/app.js", "javascript"},
+		{"../config/settings.yaml", "yaml"},
+		{"/path/to/.hidden/file.py", "python"},
+		{"./node_modules/@scope/pkg/index.ts", "typescript"},
+		{"C:\\Users\\name\\project\\main.rs", "rust"},
+		{"/path.with.dots/file.go", "go"},
+		{"./dir.name/subdir.name/file.java", "java"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.filename, func(t *testing.T) {
+			result := DetectLanguage(tt.filename, "")
+			if result != tt.expected {
+				t.Errorf("DetectLanguage(%q, \"\") = %q, want %q",
+					tt.filename, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDetectLanguage_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		expected string
+	}{
+		{"empty string", "", ""},
+		{"just extension", ".go", "go"},
+		{"just dot", ".", ""},
+		{"double dot", "..", ""},
+		{"hidden file without extension", ".hidden", ""},
+		{"hidden file with extension", ".hidden.go", "go"},
+		{"multiple extensions - last wins", "file.tar.gz", ""},           // .gz not recognized
+		{"multiple extensions - known last", "file.min.js", "javascript"}, // .js is recognized
+		{"trailing dot", "file.", ""},
+		{"multiple trailing dots", "file...", ""},
+		{"spaces in filename", "my file.go", "go"},
+		{"unicode in filename", "ファイル.go", "go"},
+		{"very long extension", "file.verylongextension", ""},
+		{"no extension", "README", ""},
+		{"uppercase no extension", "LICENSE", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := DetectLanguage(tt.filename, "")
+			if result != tt.expected {
+				t.Errorf("DetectLanguage(%q, \"\") = %q, want %q",
+					tt.filename, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDetectLanguage_ContentIgnored(t *testing.T) {
+	// The content parameter is currently not used for language detection
+	// but ensure it doesn't cause issues
+	tests := []struct {
+		name     string
+		filename string
+		content  string
+		expected string
+	}{
+		{"go with content", "main.go", "package main", "go"},
+		{"go empty content", "main.go", "", "go"},
+		{"go wrong content", "main.go", "this is not go code", "go"},
+		{"python with shebang", "script.py", "#!/usr/bin/env python", "python"},
+		{"python wrong content", "script.py", "not python at all", "python"},
+		{"unknown ext with go content", "unknown.xyz", "package main", ""}, // Content doesn't help unknown extensions
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := DetectLanguage(tt.filename, tt.content)
+			if result != tt.expected {
+				t.Errorf("DetectLanguage(%q, %q) = %q, want %q",
+					tt.filename, tt.content, result, tt.expected)
 			}
 		})
 	}
