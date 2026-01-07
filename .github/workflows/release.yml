@@ -60,8 +60,67 @@ jobs:
           name: agentviewer-${{ matrix.suffix }}
           path: agentviewer-${{ matrix.suffix }}${{ matrix.ext }}
 
-  release:
+  # Build Linux packages (.deb, .rpm)
+  package:
     needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goarch: amd64
+          - goarch: arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Install nfpm
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: agentviewer-linux-${{ matrix.goarch }}
+          path: dist
+
+      - name: List downloaded binary
+        run: ls -la dist/
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Build deb package
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+          GOARCH: ${{ matrix.goarch }}
+        run: envsubst < nfpm.yaml | nfpm package --config /dev/stdin --packager deb --target dist/
+
+      - name: Build rpm package
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+          GOARCH: ${{ matrix.goarch }}
+        run: envsubst < nfpm.yaml | nfpm package --config /dev/stdin --packager rpm --target dist/
+
+      - name: Upload deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentviewer-${{ matrix.goarch }}-deb
+          path: dist/*.deb
+
+      - name: Upload rpm artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentviewer-${{ matrix.goarch }}-rpm
+          path: dist/*.rpm
+
+  release:
+    needs: [build, package]
     runs-on: ubuntu-latest
 
     steps:
@@ -74,7 +133,7 @@ jobs:
       - name: Generate checksums
         working-directory: binaries
         run: |
-          sha256sum agentviewer-* > checksums.txt
+          sha256sum agentviewer-* *.deb *.rpm 2>/dev/null > checksums.txt || sha256sum agentviewer-* > checksums.txt
           cat checksums.txt
 
       - name: Create GitHub Release
@@ -82,6 +141,8 @@ jobs:
         with:
           files: |
             binaries/agentviewer-*
+            binaries/*.deb
+            binaries/*.rpm
             binaries/checksums.txt
           generate_release_notes: true
           draft: false

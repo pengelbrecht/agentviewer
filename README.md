@@ -31,6 +31,22 @@ brew tap pengelbrecht/agentviewer
 brew install agentviewer
 ```
 
+### Linux (apt/deb - Debian, Ubuntu)
+
+```bash
+# Download and install .deb package
+curl -LO https://github.com/pengelbrecht/agentviewer/releases/latest/download/agentviewer_$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/').deb
+sudo dpkg -i agentviewer_*.deb
+```
+
+### Linux (rpm - Fedora, RHEL, CentOS)
+
+```bash
+# Download and install .rpm package
+curl -LO https://github.com/pengelbrecht/agentviewer/releases/latest/download/agentviewer.$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/').rpm
+sudo rpm -i agentviewer.*.rpm
+```
+
 ### macOS/Linux (Binary)
 
 Download the latest release for your platform:
@@ -50,6 +66,12 @@ Available binaries:
 - `agentviewer-linux-amd64` - Linux x86_64
 - `agentviewer-linux-arm64` - Linux ARM64
 - `agentviewer-windows-amd64.exe` - Windows x86_64
+
+Available packages:
+- `agentviewer_<version>_amd64.deb` - Debian/Ubuntu x86_64
+- `agentviewer_<version>_arm64.deb` - Debian/Ubuntu ARM64
+- `agentviewer-<version>.amd64.rpm` - Fedora/RHEL x86_64
+- `agentviewer-<version>.arm64.rpm` - Fedora/RHEL ARM64
 
 ### Go Install
 

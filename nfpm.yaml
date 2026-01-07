@@ -1,0 +1,42 @@
+# nfpm configuration for building Linux packages (.deb, .rpm)
+# See: https://nfpm.goreleaser.com/docs/configuration/
+#
+# Note: nfpm does not support templating. Only arch, platform, and version fields
+# support environment variable expansion (${VAR}). For the binary path, we use
+# envsubst or create separate config files for each architecture.
+#
+# Build packages:
+#   # Using envsubst (recommended)
+#   export GOARCH=amd64 VERSION=0.1.0
+#   envsubst < nfpm.yaml | nfpm package --config /dev/stdin --packager deb --target dist/
+#
+#   # Or use Makefile targets which handle this automatically
+
+name: agentviewer
+arch: ${GOARCH}
+platform: linux
+version: ${VERSION}
+
+maintainer: Peter Engelbrecht
+description: |
+  CLI tool for AI agents to display rich content in a browser.
+  Runs a localhost web server that renders markdown, code, diffs,
+  mermaid diagrams, and more via a simple REST API.
+vendor: agentviewer
+homepage: https://github.com/peterengelbrecht/agentviewer
+license: MIT
+
+contents:
+  - src: ./dist/agentviewer-linux-${GOARCH}
+    dst: /usr/local/bin/agentviewer
+    file_info:
+      mode: 0755
+
+# rpm-specific settings
+rpm:
+  group: Applications/Internet
+  compression: gzip
+
+# deb-specific settings
+deb:
+  compression: gzip
