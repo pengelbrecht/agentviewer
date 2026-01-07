@@ -467,6 +467,40 @@ html, body {
     background: var(--bg-tertiary);
 }
 
+/* Theme icons - show appropriate icon based on current theme */
+.theme-icon {
+    display: none;
+}
+
+/* Default (dark mode or system dark): show sun icon */
+.theme-icon-dark {
+    display: inline;
+}
+
+.theme-icon-light {
+    display: none;
+}
+
+/* Light mode: show moon icon */
+[data-theme="light"] .theme-icon-dark {
+    display: none;
+}
+
+[data-theme="light"] .theme-icon-light {
+    display: inline;
+}
+
+/* Handle system light preference when no explicit theme set */
+@media (prefers-color-scheme: light) {
+    html:not([data-theme]) .theme-icon-dark {
+        display: none;
+    }
+
+    html:not([data-theme]) .theme-icon-light {
+        display: inline;
+    }
+}
+
 /* Responsive breakpoints */
 
 /* Tablet breakpoint (768px) */

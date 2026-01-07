@@ -16,22 +16,75 @@
 
     // Initialize
     function init() {
+        initTheme();
         initVendorLibs();
         connectWebSocket();
         loadTabs();
         setupKeyboardShortcuts();
+        setupThemeToggle();
+    }
+
+    // Theme management
+    const THEME_STORAGE_KEY = 'agentviewer-theme';
+
+    function initTheme() {
+        const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+        if (savedTheme) {
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+        // If no saved theme, let CSS handle it via prefers-color-scheme
+    }
+
+    function getCurrentTheme() {
+        const explicitTheme = document.documentElement.getAttribute('data-theme');
+        if (explicitTheme) {
+            return explicitTheme;
+        }
+        // No explicit theme set, use system preference
+        return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
+
+    function setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem(THEME_STORAGE_KEY, theme);
+        updateMermaidTheme(theme);
+    }
+
+    function toggleTheme() {
+        const current = getCurrentTheme();
+        const newTheme = current === 'dark' ? 'light' : 'dark';
+        setTheme(newTheme);
+    }
+
+    function setupThemeToggle() {
+        const toggleBtn = document.getElementById('theme-toggle');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', toggleTheme);
+        }
+
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            // Only update if no explicit theme is set
+            if (!localStorage.getItem(THEME_STORAGE_KEY)) {
+                updateMermaidTheme(e.matches ? 'dark' : 'light');
+            }
+        });
+    }
+
+    function updateMermaidTheme(theme) {
+        if (typeof mermaid !== 'undefined') {
+            mermaid.initialize({
+                startOnLoad: false,
+                theme: theme === 'dark' ? 'dark' : 'default',
+                securityLevel: 'loose'
+            });
+        }
     }
 
     // Initialize vendor libraries
     function initVendorLibs() {
-        // Initialize mermaid
-        if (typeof mermaid !== 'undefined') {
-            mermaid.initialize({
-                startOnLoad: false,
-                theme: 'dark',
-                securityLevel: 'loose'
-            });
-        }
+        // Initialize mermaid with current theme
+        updateMermaidTheme(getCurrentTheme());
     }
 
     // WebSocket Connection
