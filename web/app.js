@@ -7,6 +7,8 @@
     let tabs = [];
     let activeTabId = null;
     let ws = null;
+    let reconnectAttempts = 0;
+    const maxReconnectDelay = 30000; // 30 seconds max
 
     // DOM Elements
     const tabsContainer = document.getElementById('tabs-container');
@@ -39,21 +41,59 @@
 
         ws.onopen = () => {
             console.log('WebSocket connected');
+            reconnectAttempts = 0;
+            updateConnectionStatus(true);
         };
 
         ws.onmessage = (event) => {
-            const msg = JSON.parse(event.data);
-            handleWSMessage(msg);
+            try {
+                const msg = JSON.parse(event.data);
+                handleWSMessage(msg);
+            } catch (e) {
+                console.error('Failed to parse WebSocket message:', e);
+            }
         };
 
         ws.onclose = () => {
-            console.log('WebSocket disconnected, reconnecting...');
-            setTimeout(connectWebSocket, 2000);
+            console.log('WebSocket disconnected');
+            updateConnectionStatus(false);
+            scheduleReconnect();
         };
 
         ws.onerror = (error) => {
             console.error('WebSocket error:', error);
         };
+    }
+
+    // Schedule reconnection with exponential backoff
+    function scheduleReconnect() {
+        reconnectAttempts++;
+        // Exponential backoff: 1s, 2s, 4s, 8s, ... up to maxReconnectDelay
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), maxReconnectDelay);
+        console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts})...`);
+        setTimeout(connectWebSocket, delay);
+    }
+
+    // Update connection status indicator
+    function updateConnectionStatus(connected) {
+        let indicator = document.getElementById('connection-status');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'connection-status';
+            document.body.appendChild(indicator);
+        }
+
+        indicator.className = connected ? 'connected' : 'disconnected';
+        indicator.title = connected ? 'Connected' : 'Disconnected - reconnecting...';
+
+        // Hide indicator after a short delay when connected
+        if (connected) {
+            setTimeout(() => {
+                indicator.classList.add('fade-out');
+            }, 2000);
+        } else {
+            indicator.classList.remove('fade-out');
+        }
     }
 
     // Handle WebSocket messages

@@ -1,26 +1,27 @@
 package main
 
 import (
+	"os"
 	"runtime"
 	"testing"
 )
 
 func TestOpenBrowser(t *testing.T) {
-	// OpenBrowser uses exec.Command().Start() which spawns a process
-	// We can't easily mock that, so we just verify it doesn't error
-	// on supported platforms
+	// OpenBrowser uses exec.Command().Start() which spawns a process.
+	// Only run this test in CI to avoid opening browsers during local development.
+	if os.Getenv("CI") == "" {
+		t.Skip("Skipping OpenBrowser test outside CI (would open actual browser)")
+	}
 
-	url := "http://127.0.0.1:9999/test" // Non-existent URL is fine
+	url := "http://127.0.0.1:9999/test"
 
 	switch runtime.GOOS {
 	case "darwin", "linux", "windows":
-		// On these platforms, we expect the command to start without error
-		// Note: The browser opening is async (Start not Run), so this won't block
+		// On these platforms, we expect the command to start without error.
+		// In CI, this will likely fail due to no display - that's fine.
 		err := OpenBrowser(url)
-		// On CI, we might not have a display, so we accept the error
-		// The important thing is the code path is executed
 		if err != nil {
-			t.Logf("OpenBrowser returned error (may be expected on CI): %v", err)
+			t.Logf("OpenBrowser returned error (expected in CI without display): %v", err)
 		}
 	default:
 		// On unsupported platforms, we expect an error
