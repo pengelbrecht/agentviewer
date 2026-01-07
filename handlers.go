@@ -71,6 +71,8 @@ var ValidTabTypes = map[string]bool{
 	"code":     true,
 	"diff":     true,
 	"image":    true,
+	"csv":      true,
+	"mermaid":  true,
 }
 
 // handleCreateTab handles POST /api/tabs.
@@ -83,7 +85,7 @@ func (s *Server) handleCreateTab(w http.ResponseWriter, r *http.Request) {
 
 	// Validate tab type
 	if !ValidTabTypes[req.Type] {
-		writeError(w, http.StatusBadRequest, "Invalid type: must be 'markdown', 'code', 'diff', or 'image'")
+		writeError(w, http.StatusBadRequest, "Invalid type: must be 'markdown', 'code', 'diff', 'image', 'csv', or 'mermaid'")
 		return
 	}
 

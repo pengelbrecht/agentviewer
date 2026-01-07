@@ -1791,6 +1791,31 @@ func TestFileAccessLogging(t *testing.T) {
 	})
 }
 
+func TestDetectContentType_CSV(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		expected TabType
+	}{
+		{"csv lowercase", "data.csv", TabTypeCSV},
+		{"csv uppercase", "DATA.CSV", TabTypeCSV},
+		{"csv mixed case", "Data.Csv", TabTypeCSV},
+		{"csv with path", "/path/to/data.csv", TabTypeCSV},
+		{"csv relative path", "./reports/sales.csv", TabTypeCSV},
+		{"csv complex filename", "2024-01-report_data.csv", TabTypeCSV},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := DetectContentType(tt.filename, "")
+			if result != tt.expected {
+				t.Errorf("DetectContentType(%q, \"\") = %v, want %v",
+					tt.filename, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestDetectContentType_Images(t *testing.T) {
 	tests := []struct {
 		name     string

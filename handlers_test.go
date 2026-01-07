@@ -74,7 +74,7 @@ func TestCreateTab_InvalidType(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
-	if resp.Error != "Invalid type: must be 'markdown', 'code', 'diff', or 'image'" {
+	if resp.Error != "Invalid type: must be 'markdown', 'code', 'diff', 'image', 'csv', or 'mermaid'" {
 		t.Errorf("unexpected error: %q", resp.Error)
 	}
 }

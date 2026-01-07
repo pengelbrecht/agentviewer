@@ -203,6 +203,8 @@ func DetectContentType(filename, content string) TabType {
 			return TabTypeMermaid
 		case ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp":
 			return TabTypeImage
+		case ".csv":
+			return TabTypeCSV
 		}
 		// Default to code for known source files
 		if lang := DetectLanguage(filename, content); lang != "" {
