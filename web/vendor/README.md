@@ -11,6 +11,7 @@ This directory contains embedded JavaScript libraries for the frontend.
 | mermaid.js | 11.4.1 | Diagram rendering |
 | KaTeX | 0.16.18 | Math rendering |
 | diff2html | 3.4.51 | Diff rendering |
+| diff2html-ui | 3.4.51 | Diff rendering with syntax highlighting (slim bundle) |
 
 ## Files
 
@@ -21,7 +22,8 @@ This directory contains embedded JavaScript libraries for the frontend.
 - `katex.min.js` - Math renderer
 - `katex.min.css` - KaTeX styles
 - `katex-fonts/` - KaTeX font files (woff2)
-- `diff2html.min.js` - Diff renderer
+- `diff2html.min.js` - Diff renderer (basic)
+- `diff2html-ui-slim.min.js` - Diff renderer with highlight.js integration (slim)
 - `diff2html.min.css` - Diff styles
 
 ## Usage in HTML
@@ -37,5 +39,5 @@ This directory contains embedded JavaScript libraries for the frontend.
 <script src="/vendor/highlight.min.js"></script>
 <script src="/vendor/mermaid.min.js"></script>
 <script src="/vendor/katex.min.js"></script>
-<script src="/vendor/diff2html.min.js"></script>
+<script src="/vendor/diff2html-ui-slim.min.js"></script>
 ```

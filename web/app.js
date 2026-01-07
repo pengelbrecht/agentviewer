@@ -583,33 +583,76 @@
         }</tbody></table>`;
     }
 
-    // Render diff using diff2html for side-by-side view
+    // Render diff using diff2html-ui for side-by-side view with syntax highlighting
     function renderDiff(content, tab) {
-        // Use diff2html if available
+        // Generate a unique container ID for this diff
+        const containerId = 'diff-container-' + Date.now();
+
+        // Use Diff2HtmlUI if available (from diff2html-ui bundle)
+        if (typeof Diff2HtmlUI !== 'undefined') {
+            // Return a container element that we'll populate after it's in the DOM
+            // Schedule the diff rendering after this element is added to DOM
+            setTimeout(() => {
+                const container = document.getElementById(containerId);
+                if (!container) return;
+
+                try {
+                    // Ensure the diff content has proper format
+                    const normalizedContent = normalizeUnifiedDiff(content);
+
+                    // Detect language from tab metadata or file extension
+                    const language = detectDiffLanguage(tab);
+
+                    // Create Diff2HtmlUI instance
+                    const diff2htmlUi = new Diff2HtmlUI(container, normalizedContent, {
+                        drawFileList: false,
+                        matching: 'lines',
+                        outputFormat: 'side-by-side',
+                        renderNothingWhenEmpty: false,
+                        colorScheme: 'auto',
+                        highlight: true,
+                        rawTemplates: {
+                            'side-by-side-file-diff': `
+                                <div id="{{fileHtmlId}}" class="d2h-file-wrapper" data-lang="{{file.language}}">
+                                    <div class="d2h-file-diff">
+                                        <div class="d2h-code-wrapper">
+                                            <table class="d2h-diff-table">
+                                                <tbody class="d2h-diff-tbody">
+                                                {{{diffs}}}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>`
+                        }
+                    });
+
+                    // Draw the diff
+                    diff2htmlUi.draw();
+
+                    // Apply syntax highlighting
+                    diff2htmlUi.highlightCode();
+
+                } catch (e) {
+                    console.error('Diff2HtmlUI error:', e);
+                    // Fallback on error - pass language for highlighting
+                    const lang = detectDiffLanguage(tab);
+                    container.innerHTML = renderSideBySideFallback(content, lang);
+                }
+            }, 0);
+
+            return `<div id="${containerId}" class="diff2html-wrapper"></div>`;
+        }
+
+        // Fallback to Diff2Html.html (non-UI version) if available
         if (typeof Diff2Html !== 'undefined') {
             try {
-                // Ensure the diff content has proper format
                 const normalizedContent = normalizeUnifiedDiff(content);
-
                 return Diff2Html.html(normalizedContent, {
                     drawFileList: false,
                     matching: 'lines',
                     outputFormat: 'side-by-side',
                     renderNothingWhenEmpty: false,
-                    rawTemplates: {
-                        'side-by-side-file-diff': `
-                            <div id="{{fileHtmlId}}" class="d2h-file-wrapper" data-lang="{{file.language}}">
-                                <div class="d2h-file-diff">
-                                    <div class="d2h-code-wrapper">
-                                        <table class="d2h-diff-table">
-                                            <tbody class="d2h-diff-tbody">
-                                            {{{diffs}}}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>`
-                    },
                     colorScheme: 'auto'
                 });
             } catch (e) {
@@ -617,8 +660,82 @@
             }
         }
 
-        // Fallback: custom side-by-side diff rendering
-        return renderSideBySideFallback(content);
+        // Fallback: custom side-by-side diff rendering with syntax highlighting
+        const lang = detectDiffLanguage(tab);
+        return renderSideBySideFallback(content, lang);
+    }
+
+    // Detect programming language from tab metadata or diff content
+    function detectDiffLanguage(tab) {
+        // Check if language is explicitly set in tab metadata
+        if (tab && tab.language) {
+            return tab.language;
+        }
+
+        // Try to extract from diff file headers
+        if (tab && tab.content) {
+            const lines = tab.content.split('\n');
+            for (const line of lines) {
+                // Look for +++ b/path/to/file.ext pattern
+                const match = line.match(/^\+\+\+ [ab]?\/?(.*)/);
+                if (match && match[1]) {
+                    const filePath = match[1];
+                    const ext = filePath.split('.').pop();
+                    return getLanguageFromExtension(ext);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    // Map file extensions to highlight.js language names
+    function getLanguageFromExtension(ext) {
+        const extMap = {
+            'js': 'javascript',
+            'jsx': 'javascript',
+            'ts': 'typescript',
+            'tsx': 'typescript',
+            'py': 'python',
+            'rb': 'ruby',
+            'go': 'go',
+            'rs': 'rust',
+            'java': 'java',
+            'kt': 'kotlin',
+            'swift': 'swift',
+            'c': 'c',
+            'cpp': 'cpp',
+            'cc': 'cpp',
+            'h': 'c',
+            'hpp': 'cpp',
+            'cs': 'csharp',
+            'php': 'php',
+            'html': 'html',
+            'htm': 'html',
+            'css': 'css',
+            'scss': 'scss',
+            'sass': 'sass',
+            'less': 'less',
+            'json': 'json',
+            'xml': 'xml',
+            'yaml': 'yaml',
+            'yml': 'yaml',
+            'md': 'markdown',
+            'sql': 'sql',
+            'sh': 'bash',
+            'bash': 'bash',
+            'zsh': 'bash',
+            'ps1': 'powershell',
+            'dockerfile': 'dockerfile',
+            'makefile': 'makefile',
+            'lua': 'lua',
+            'r': 'r',
+            'scala': 'scala',
+            'perl': 'perl',
+            'pl': 'perl'
+        };
+
+        return extMap[ext?.toLowerCase()] || null;
     }
 
     // Normalize unified diff format for diff2html
@@ -656,16 +773,26 @@
     }
 
     // Fallback side-by-side diff rendering when diff2html fails
-    function renderSideBySideFallback(content) {
+    // Accepts optional language parameter for syntax highlighting
+    function renderSideBySideFallback(content, language) {
         const lines = content.split('\n');
         const leftLines = [];
         const rightLines = [];
         let leftNum = 1;
         let rightNum = 1;
+        let detectedLang = language;
 
         for (const line of lines) {
-            // Skip file headers
+            // Skip file headers but extract language hint
             if (line.startsWith('---') || line.startsWith('+++') || line.startsWith('diff ')) {
+                // Try to detect language from file path if not already set
+                if (!detectedLang) {
+                    const match = line.match(/^\+\+\+ [ab]?\/?(.*)/);
+                    if (match && match[1]) {
+                        const ext = match[1].split('.').pop();
+                        detectedLang = getLanguageFromExtension(ext);
+                    }
+                }
                 continue;
             }
 
@@ -695,6 +822,24 @@
             }
         }
 
+        // Apply syntax highlighting to content if highlight.js is available
+        function highlightLine(text, lang) {
+            if (!text || text.trim() === '') return escapeHtml(text);
+            if (typeof hljs === 'undefined') return escapeHtml(text);
+
+            try {
+                if (lang && hljs.getLanguage(lang)) {
+                    return hljs.highlight(text, { language: lang }).value;
+                } else if (text.trim()) {
+                    // Auto-detect language
+                    return hljs.highlightAuto(text).value;
+                }
+            } catch (e) {
+                console.error('Highlight error in diff fallback:', e);
+            }
+            return escapeHtml(text);
+        }
+
         // Build the table
         const maxRows = Math.max(leftLines.length, rightLines.length);
         let rows = '';
@@ -708,12 +853,16 @@
             const leftNumStr = left.num !== null ? left.num : '';
             const rightNumStr = right.num !== null ? right.num : '';
 
+            // Apply syntax highlighting to code content (not hunks or empty lines)
+            const leftContent = left.type === 'hunk' ? escapeHtml(left.content) : highlightLine(left.content, detectedLang);
+            const rightContent = right.type === 'hunk' ? escapeHtml(right.content) : highlightLine(right.content, detectedLang);
+
             rows += `<tr>
                 <td class="diff-line-num ${leftClass}">${leftNumStr}</td>
-                <td class="${leftClass}">${escapeHtml(left.content)}</td>
+                <td class="${leftClass}">${leftContent}</td>
                 <td class="diff-gutter"></td>
                 <td class="diff-line-num ${rightClass}">${rightNumStr}</td>
-                <td class="${rightClass}">${escapeHtml(right.content)}</td>
+                <td class="${rightClass}">${rightContent}</td>
             </tr>`;
         }
 
