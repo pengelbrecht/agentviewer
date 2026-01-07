@@ -149,3 +149,68 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save checksums for formula update
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: binaries/checksums.txt
+
+  update-homebrew:
+    needs: release
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.ref_name, '-') }}  # Skip for prereleases
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download checksums
+        uses: actions/download-artifact@v4
+        with:
+          name: checksums
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Update Homebrew formula
+        run: |
+          # Extract SHA256 hashes from checksums.txt
+          SHA_DARWIN_ARM64=$(grep 'agentviewer-darwin-arm64$' checksums.txt | awk '{print $1}')
+          SHA_DARWIN_AMD64=$(grep 'agentviewer-darwin-amd64$' checksums.txt | awk '{print $1}')
+          SHA_LINUX_ARM64=$(grep 'agentviewer-linux-arm64$' checksums.txt | awk '{print $1}')
+          SHA_LINUX_AMD64=$(grep 'agentviewer-linux-amd64$' checksums.txt | awk '{print $1}')
+
+          echo "Darwin ARM64: $SHA_DARWIN_ARM64"
+          echo "Darwin AMD64: $SHA_DARWIN_AMD64"
+          echo "Linux ARM64: $SHA_LINUX_ARM64"
+          echo "Linux AMD64: $SHA_LINUX_AMD64"
+
+          # Update version
+          sed -i "s/version \".*\"/version \"${{ steps.version.outputs.VERSION }}\"/" homebrew/Formula/agentviewer.rb
+
+          # Update SHA256 hashes (replace placeholders or existing hashes)
+          sed -i "s/sha256 \"PLACEHOLDER_SHA256_DARWIN_ARM64\"/sha256 \"$SHA_DARWIN_ARM64\"/" homebrew/Formula/agentviewer.rb
+          sed -i "s/sha256 \"PLACEHOLDER_SHA256_DARWIN_AMD64\"/sha256 \"$SHA_DARWIN_AMD64\"/" homebrew/Formula/agentviewer.rb
+          sed -i "s/sha256 \"PLACEHOLDER_SHA256_LINUX_ARM64\"/sha256 \"$SHA_LINUX_ARM64\"/" homebrew/Formula/agentviewer.rb
+          sed -i "s/sha256 \"PLACEHOLDER_SHA256_LINUX_AMD64\"/sha256 \"$SHA_LINUX_AMD64\"/" homebrew/Formula/agentviewer.rb
+
+          # Also handle updates (replace existing 64-char hashes)
+          sed -i "s/sha256 \"[a-f0-9]\{64\}\"\(.*darwin-arm64\)/sha256 \"$SHA_DARWIN_ARM64\"\1/" homebrew/Formula/agentviewer.rb
+          sed -i "s/sha256 \"[a-f0-9]\{64\}\"\(.*darwin-amd64\)/sha256 \"$SHA_DARWIN_AMD64\"\1/" homebrew/Formula/agentviewer.rb
+          sed -i "s/sha256 \"[a-f0-9]\{64\}\"\(.*linux-arm64\)/sha256 \"$SHA_LINUX_ARM64\"\1/" homebrew/Formula/agentviewer.rb
+          sed -i "s/sha256 \"[a-f0-9]\{64\}\"\(.*linux-amd64\)/sha256 \"$SHA_LINUX_AMD64\"\1/" homebrew/Formula/agentviewer.rb
+
+          cat homebrew/Formula/agentviewer.rb
+
+      - name: Commit and push formula update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add homebrew/Formula/agentviewer.rb
+          git commit -m "Update Homebrew formula for ${{ github.ref_name }}" || echo "No changes to commit"
+          git push

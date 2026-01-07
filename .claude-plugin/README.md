@@ -8,7 +8,7 @@ To install the plugin from a local clone:
 
 ```bash
 # Clone the repository
-git clone https://github.com/peterengelbrecht/agentviewer.git
+git clone https://github.com/pengelbrecht/agentviewer.git
 cd agentviewer
 
 # Install the plugin locally

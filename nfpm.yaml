@@ -23,7 +23,7 @@ description: |
   Runs a localhost web server that renders markdown, code, diffs,
   mermaid diagrams, and more via a simple REST API.
 vendor: agentviewer
-homepage: https://github.com/peterengelbrecht/agentviewer
+homepage: https://github.com/pengelbrecht/agentviewer
 license: MIT
 
 contents:

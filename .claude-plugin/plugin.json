@@ -4,11 +4,11 @@
   "version": "0.1.0",
   "author": {
     "name": "Peter Engelbrecht",
-    "url": "https://github.com/peterengelbrecht"
+    "url": "https://github.com/pengelbrecht"
   },
-  "repository": "https://github.com/peterengelbrecht/agentviewer",
+  "repository": "https://github.com/pengelbrecht/agentviewer",
   "license": "MIT",
-  "homepage": "https://github.com/peterengelbrecht/agentviewer",
+  "homepage": "https://github.com/pengelbrecht/agentviewer",
   "keywords": [
     "viewer",
     "markdown",

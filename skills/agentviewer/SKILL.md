@@ -3,7 +3,7 @@ name: agentviewer
 description: Display rich content (markdown, code, diffs, mermaid diagrams) to users in a browser viewer. Use when you need to show complex content that benefits from rich rendering - reports, documentation, code with syntax highlighting, git diffs, or diagrams.
 allowed-tools: "Read,Bash(curl:*,agentviewer:*)"
 version: "0.1.0"
-author: "Peter Engelbrecht <https://github.com/peterengelbrecht>"
+author: "Peter Engelbrecht <https://github.com/pengelbrecht>"
 license: "MIT"
 ---
 
@@ -23,7 +23,7 @@ agentviewer --version  # Requires agentviewer installed
 
 Install via:
 - **Homebrew**: `brew install agentviewer`
-- **Go**: `go install github.com/peterengelbrecht/agentviewer@latest`
+- **Go**: `go install github.com/pengelbrecht/agentviewer@latest`
 - **Binary**: Download from GitHub releases
 
 ## Quick Start

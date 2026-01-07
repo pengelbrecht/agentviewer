@@ -70,7 +70,7 @@ Claude Code has multiple distribution channels for plugins:
 **User installation**:
 ```bash
 # Add marketplace
-/plugin marketplace add peterengelbrecht/agentviewer
+/plugin marketplace add pengelbrecht/agentviewer
 
 # Install plugin
 /plugin install agentviewer@agentviewer-marketplace
@@ -78,7 +78,7 @@ Claude Code has multiple distribution channels for plugins:
 
 Or directly:
 ```bash
-/plugin add github:peterengelbrecht/agentviewer
+/plugin add github:pengelbrecht/agentviewer
 ```
 
 ### Option 3: Community Registry (claude-plugins.dev)
@@ -127,9 +127,9 @@ npm publish claude-plugin-agentviewer
     "name": "Peter Engelbrecht",
     "email": "email@example.com"
   },
-  "repository": "https://github.com/peterengelbrecht/agentviewer",
+  "repository": "https://github.com/pengelbrecht/agentviewer",
   "license": "MIT",
-  "homepage": "https://github.com/peterengelbrecht/agentviewer",
+  "homepage": "https://github.com/pengelbrecht/agentviewer",
   "keywords": ["viewer", "markdown", "code", "diff", "mermaid", "agent-tools"],
   "category": "productivity"
 }
@@ -174,7 +174,7 @@ Based on existing plugins:
 
 Agentviewer already supports direct GitHub installation:
 ```bash
-/plugin add github:peterengelbrecht/agentviewer
+/plugin add github:pengelbrecht/agentviewer
 ```
 
 This works today with no approval needed.
@@ -211,7 +211,7 @@ For official marketplace submission, entry in `marketplace.json`:
   },
   "source": "./external_plugins/agentviewer",
   "category": "productivity",
-  "homepage": "https://github.com/peterengelbrecht/agentviewer",
+  "homepage": "https://github.com/pengelbrecht/agentviewer",
   "tags": ["viewer", "markdown", "code", "diff", "mermaid", "rich-content"]
 }
 ```
