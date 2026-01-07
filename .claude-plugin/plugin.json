@@ -1,0 +1,20 @@
+{
+  "name": "agentviewer",
+  "description": "Display rich content (markdown, code, diffs, diagrams) in a browser-based tabbed viewer for AI agents",
+  "version": "0.1.0",
+  "author": {
+    "name": "Peter Engelbrecht",
+    "url": "https://github.com/peterengelbrecht"
+  },
+  "repository": "https://github.com/peterengelbrecht/agentviewer",
+  "license": "MIT",
+  "homepage": "https://github.com/peterengelbrecht/agentviewer",
+  "keywords": [
+    "viewer",
+    "markdown",
+    "code",
+    "diff",
+    "mermaid",
+    "agent-tools"
+  ]
+}

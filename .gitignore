@@ -1,6 +1,6 @@
-# Binaries
-agentviewer
-agentviewer_test
+# Binaries (only in root directory, not in skills/)
+/agentviewer
+/agentviewer_test
 *.exe
 *.dll
 *.so

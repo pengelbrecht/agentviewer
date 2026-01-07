@@ -1,0 +1,15 @@
+{
+  "name": "agentviewer-marketplace",
+  "description": "Local marketplace for agentviewer plugin development",
+  "owner": {
+    "name": "Peter Engelbrecht"
+  },
+  "plugins": [
+    {
+      "name": "agentviewer",
+      "source": "./",
+      "description": "Display rich content in browser viewer for AI agents",
+      "version": "0.1.0"
+    }
+  ]
+}
