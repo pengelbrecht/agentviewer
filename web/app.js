@@ -290,7 +290,7 @@
                 break;
 
             case 'diff':
-                html = `<div class="content-diff">${renderDiff(tab.content)}</div>`;
+                html = `<div class="content-diff">${renderDiff(tab.content, tab)}</div>`;
                 break;
 
             default:
@@ -583,35 +583,147 @@
         }</tbody></table>`;
     }
 
-    // Render diff using diff2html
-    function renderDiff(content) {
+    // Render diff using diff2html for side-by-side view
+    function renderDiff(content, tab) {
         // Use diff2html if available
         if (typeof Diff2Html !== 'undefined') {
             try {
-                return Diff2Html.html(content, {
+                // Ensure the diff content has proper format
+                const normalizedContent = normalizeUnifiedDiff(content);
+
+                return Diff2Html.html(normalizedContent, {
                     drawFileList: false,
                     matching: 'lines',
                     outputFormat: 'side-by-side',
-                    renderNothingWhenEmpty: false
+                    renderNothingWhenEmpty: false,
+                    rawTemplates: {
+                        'side-by-side-file-diff': `
+                            <div id="{{fileHtmlId}}" class="d2h-file-wrapper" data-lang="{{file.language}}">
+                                <div class="d2h-file-diff">
+                                    <div class="d2h-code-wrapper">
+                                        <table class="d2h-diff-table">
+                                            <tbody class="d2h-diff-tbody">
+                                            {{{diffs}}}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>`
+                    },
+                    colorScheme: 'auto'
                 });
             } catch (e) {
                 console.error('Diff2Html error:', e);
             }
         }
 
-        // Fallback: basic diff rendering
-        const lines = escapeHtml(content).split('\n');
-        return `<div class="diff-fallback">${lines.map(line => {
-            let className = 'diff-line';
-            if (line.startsWith('+') && !line.startsWith('+++')) {
-                className += ' diff-add';
-            } else if (line.startsWith('-') && !line.startsWith('---')) {
-                className += ' diff-remove';
-            } else if (line.startsWith('@@')) {
-                className += ' diff-hunk';
+        // Fallback: custom side-by-side diff rendering
+        return renderSideBySideFallback(content);
+    }
+
+    // Normalize unified diff format for diff2html
+    function normalizeUnifiedDiff(content) {
+        // If content doesn't start with diff markers, wrap it
+        const lines = content.split('\n');
+
+        // Check if it's already a proper unified diff
+        const hasFileHeaders = lines.some(l => l.startsWith('---')) &&
+                              lines.some(l => l.startsWith('+++'));
+        const hasHunkHeaders = lines.some(l => l.startsWith('@@'));
+
+        if (hasFileHeaders && hasHunkHeaders) {
+            return content;
+        }
+
+        // If we only have hunk content (no headers), add minimal headers
+        if (hasHunkHeaders && !hasFileHeaders) {
+            return '--- a/original\n+++ b/modified\n' + content;
+        }
+
+        // If it's raw diff lines without any headers, try to wrap them
+        if (lines.some(l => l.startsWith('+') || l.startsWith('-') || l.startsWith(' '))) {
+            // Count the lines to estimate ranges
+            let oldCount = 0, newCount = 0;
+            for (const line of lines) {
+                if (line.startsWith('-') && !line.startsWith('---')) oldCount++;
+                else if (line.startsWith('+') && !line.startsWith('+++')) newCount++;
+                else if (line.startsWith(' ')) { oldCount++; newCount++; }
             }
-            return `<div class="${className}">${line}</div>`;
-        }).join('')}</div>`;
+            return `--- a/original\n+++ b/modified\n@@ -1,${oldCount || 1} +1,${newCount || 1} @@\n${content}`;
+        }
+
+        return content;
+    }
+
+    // Fallback side-by-side diff rendering when diff2html fails
+    function renderSideBySideFallback(content) {
+        const lines = content.split('\n');
+        const leftLines = [];
+        const rightLines = [];
+        let leftNum = 1;
+        let rightNum = 1;
+
+        for (const line of lines) {
+            // Skip file headers
+            if (line.startsWith('---') || line.startsWith('+++') || line.startsWith('diff ')) {
+                continue;
+            }
+
+            // Skip hunk headers but use them to reset line numbers
+            if (line.startsWith('@@')) {
+                const match = line.match(/@@ -(\d+),?\d* \+(\d+),?\d* @@/);
+                if (match) {
+                    leftNum = parseInt(match[1], 10);
+                    rightNum = parseInt(match[2], 10);
+                }
+                // Add hunk header row
+                leftLines.push({ type: 'hunk', content: line, num: null });
+                rightLines.push({ type: 'hunk', content: '', num: null });
+                continue;
+            }
+
+            if (line.startsWith('-')) {
+                leftLines.push({ type: 'delete', content: line.substring(1), num: leftNum++ });
+                rightLines.push({ type: 'empty', content: '', num: null });
+            } else if (line.startsWith('+')) {
+                leftLines.push({ type: 'empty', content: '', num: null });
+                rightLines.push({ type: 'add', content: line.substring(1), num: rightNum++ });
+            } else if (line.startsWith(' ') || line === '') {
+                const actualLine = line.startsWith(' ') ? line.substring(1) : '';
+                leftLines.push({ type: 'context', content: actualLine, num: leftNum++ });
+                rightLines.push({ type: 'context', content: actualLine, num: rightNum++ });
+            }
+        }
+
+        // Build the table
+        const maxRows = Math.max(leftLines.length, rightLines.length);
+        let rows = '';
+
+        for (let i = 0; i < maxRows; i++) {
+            const left = leftLines[i] || { type: 'empty', content: '', num: null };
+            const right = rightLines[i] || { type: 'empty', content: '', num: null };
+
+            const leftClass = `diff-line diff-${left.type}`;
+            const rightClass = `diff-line diff-${right.type}`;
+            const leftNumStr = left.num !== null ? left.num : '';
+            const rightNumStr = right.num !== null ? right.num : '';
+
+            rows += `<tr>
+                <td class="diff-line-num ${leftClass}">${leftNumStr}</td>
+                <td class="${leftClass}">${escapeHtml(left.content)}</td>
+                <td class="diff-gutter"></td>
+                <td class="diff-line-num ${rightClass}">${rightNumStr}</td>
+                <td class="${rightClass}">${escapeHtml(right.content)}</td>
+            </tr>`;
+        }
+
+        return `<div class="diff-side-by-side">
+            <div class="diff-header">
+                <div class="diff-header-left">Original</div>
+                <div class="diff-header-right">Modified</div>
+            </div>
+            <table class="diff-table"><tbody>${rows}</tbody></table>
+        </div>`;
     }
 
     // Activate a tab
