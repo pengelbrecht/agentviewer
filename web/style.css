@@ -75,6 +75,8 @@ html, body {
     font-size: 13px;
     white-space: nowrap;
     transition: background 0.1s;
+    max-width: 200px;
+    flex-shrink: 0;
 }
 
 .tab:hover {
@@ -88,6 +90,8 @@ html, body {
 
 .tab-title {
     margin-right: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .tab-close {

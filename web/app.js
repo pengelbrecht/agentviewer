@@ -123,6 +123,21 @@
                     activateTab(el.dataset.id);
                 }
             });
+
+            // Middle-click to close tab
+            el.addEventListener('mousedown', (e) => {
+                if (e.button === 1) { // Middle mouse button
+                    e.preventDefault();
+                    closeTab(el.dataset.id);
+                }
+            });
+
+            // Prevent middle-click from triggering browser behavior
+            el.addEventListener('auxclick', (e) => {
+                if (e.button === 1) {
+                    e.preventDefault();
+                }
+            });
         });
     }
 
