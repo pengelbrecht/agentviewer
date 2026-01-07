@@ -972,6 +972,63 @@ html, body {
     outline: none;
 }
 
+/* ========== Collapsible unchanged sections ========== */
+.diff-expand-row {
+    background: var(--bg-tertiary) !important;
+}
+
+.diff-expand-cell {
+    padding: 0 !important;
+    text-align: center;
+    background: var(--bg-tertiary);
+    border-top: 1px dashed var(--border);
+    border-bottom: 1px dashed var(--border);
+}
+
+.diff-expand-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 6px 12px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-size: var(--font-size-small);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    justify-content: center;
+}
+
+.diff-expand-btn:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.diff-expand-icon {
+    font-size: 10px;
+    color: var(--text-muted);
+    transition: transform 0.15s ease;
+}
+
+.diff-expand-btn[data-expanded="true"] .diff-expand-icon {
+    transform: rotate(90deg);
+}
+
+.diff-expand-text {
+    color: var(--text-muted);
+}
+
+.diff-expand-btn:hover .diff-expand-text {
+    color: var(--accent);
+}
+
+/* Style for collapsed rows (hidden by JS but in case CSS is checked) */
+.diff-collapsed-row {
+    display: none;
+}
+
 /* Diff fallback (simple line rendering) */
 .diff-fallback {
     padding: 12px;

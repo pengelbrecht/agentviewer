@@ -634,6 +634,9 @@
                     // Apply syntax highlighting
                     diff2htmlUi.highlightCode();
 
+                    // Setup collapsible sections for unchanged code
+                    setupCollapsibleSections(container);
+
                     // Setup navigation after diff is rendered
                     setupDiffNavigation(navId, container);
 
@@ -642,6 +645,7 @@
                     // Fallback on error - pass language for highlighting
                     const lang = detectDiffLanguage(tab);
                     container.innerHTML = renderSideBySideFallback(content, lang);
+                    setupCollapsibleSections(container);
                     setupDiffNavigation(navId, container);
                 }
             }, 0);
@@ -660,11 +664,13 @@
                     renderNothingWhenEmpty: false,
                     colorScheme: 'auto'
                 });
-                // Setup navigation after DOM is updated
+                // Setup collapsible sections and navigation after DOM is updated
                 setTimeout(() => {
                     const navEl = document.getElementById(navId);
                     if (navEl) {
-                        setupDiffNavigation(navId, navEl.parentElement.querySelector('.diff2html-wrapper, .diff-side-by-side'));
+                        const diffContainer = navEl.parentElement.querySelector('.diff2html-wrapper, .diff-side-by-side');
+                        setupCollapsibleSections(diffContainer);
+                        setupDiffNavigation(navId, diffContainer);
                     }
                 }, 0);
                 return renderDiffNavBar(navId) + `<div class="diff2html-wrapper">${diffHtml}</div>`;
@@ -676,15 +682,23 @@
         // Fallback: custom side-by-side diff rendering with syntax highlighting
         const lang = detectDiffLanguage(tab);
         const fallbackHtml = renderSideBySideFallback(content, lang);
-        // Setup navigation after DOM is updated
+        // Setup collapsible sections and navigation after DOM is updated
         setTimeout(() => {
             const navEl = document.getElementById(navId);
             if (navEl) {
-                setupDiffNavigation(navId, navEl.parentElement.querySelector('.diff-side-by-side'));
+                const diffContainer = navEl.parentElement.querySelector('.diff-side-by-side');
+                setupCollapsibleSections(diffContainer);
+                setupDiffNavigation(navId, diffContainer);
             }
         }, 0);
         return renderDiffNavBar(navId) + fallbackHtml;
     }
+
+    // Configuration for collapsible unchanged sections
+    const COLLAPSE_CONFIG = {
+        minUnchangedToCollapse: 8, // Minimum unchanged lines before collapsing
+        contextLines: 3            // Lines to show above/below changes
+    };
 
     // Render the diff navigation bar HTML
     function renderDiffNavBar(navId) {
@@ -822,6 +836,177 @@
 
         // Initialize display
         updateCurrentDisplay();
+    }
+
+    // Setup collapsible unchanged sections in diff view
+    function setupCollapsibleSections(diffContainer) {
+        if (!diffContainer) return;
+
+        // Find all rows in the diff table
+        const tbody = diffContainer.querySelector('.d2h-diff-tbody, .diff-table tbody');
+        if (!tbody) return;
+
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        if (rows.length === 0) return;
+
+        // Identify unchanged (context) rows vs changed rows
+        // diff2html: .d2h-cntx or rows without .d2h-ins/.d2h-del
+        // fallback: .diff-context or rows without .diff-add/.diff-delete
+        function isUnchangedRow(row) {
+            // diff2html context lines
+            if (row.classList.contains('d2h-cntx')) return true;
+            // fallback context lines
+            if (row.querySelector('.diff-context')) return true;
+            // If it's not an ins/del row and not a hunk header, it's context
+            if (!row.classList.contains('d2h-ins') &&
+                !row.classList.contains('d2h-del') &&
+                !row.querySelector('.diff-add') &&
+                !row.querySelector('.diff-delete') &&
+                !row.querySelector('.diff-hunk') &&
+                !row.classList.contains('d2h-info')) {
+                return true;
+            }
+            return false;
+        }
+
+        function isHunkHeader(row) {
+            return row.classList.contains('d2h-info') ||
+                   row.querySelector('.diff-hunk') !== null;
+        }
+
+        // Group consecutive unchanged rows
+        const groups = [];
+        let currentGroup = { type: 'mixed', rows: [] };
+
+        for (const row of rows) {
+            if (isHunkHeader(row)) {
+                // Hunk headers break groups
+                if (currentGroup.rows.length > 0) {
+                    groups.push(currentGroup);
+                }
+                groups.push({ type: 'hunk', rows: [row] });
+                currentGroup = { type: 'mixed', rows: [] };
+            } else if (isUnchangedRow(row)) {
+                if (currentGroup.type === 'unchanged') {
+                    currentGroup.rows.push(row);
+                } else {
+                    if (currentGroup.rows.length > 0) {
+                        groups.push(currentGroup);
+                    }
+                    currentGroup = { type: 'unchanged', rows: [row] };
+                }
+            } else {
+                if (currentGroup.type === 'changed' || currentGroup.type === 'mixed') {
+                    currentGroup.rows.push(row);
+                    currentGroup.type = 'changed';
+                } else {
+                    if (currentGroup.rows.length > 0) {
+                        groups.push(currentGroup);
+                    }
+                    currentGroup = { type: 'changed', rows: [row] };
+                }
+            }
+        }
+        if (currentGroup.rows.length > 0) {
+            groups.push(currentGroup);
+        }
+
+        // Process unchanged groups to determine what to collapse
+        const { minUnchangedToCollapse, contextLines } = COLLAPSE_CONFIG;
+
+        for (let i = 0; i < groups.length; i++) {
+            const group = groups[i];
+            if (group.type !== 'unchanged') continue;
+
+            const unchangedCount = group.rows.length;
+
+            // Only collapse if we have enough unchanged lines
+            if (unchangedCount <= minUnchangedToCollapse) continue;
+
+            // Determine how many context lines to keep at top/bottom
+            const prevGroup = groups[i - 1];
+            const nextGroup = groups[i + 1];
+
+            // Keep context lines at top if there's a preceding changed group
+            const keepTop = (prevGroup && (prevGroup.type === 'changed' || prevGroup.type === 'hunk'))
+                ? contextLines : 0;
+
+            // Keep context lines at bottom if there's a following changed group
+            const keepBottom = (nextGroup && (nextGroup.type === 'changed' || nextGroup.type === 'hunk'))
+                ? contextLines : 0;
+
+            const toCollapse = unchangedCount - keepTop - keepBottom;
+
+            if (toCollapse <= 2) continue; // Not worth collapsing
+
+            // Create collapsed section
+            const startIdx = keepTop;
+            const endIdx = unchangedCount - keepBottom;
+            const collapsedRows = group.rows.slice(startIdx, endIdx);
+            const hiddenCount = collapsedRows.length;
+
+            // Hide the collapsed rows
+            collapsedRows.forEach(row => {
+                row.classList.add('diff-collapsed-row');
+                row.style.display = 'none';
+            });
+
+            // Create expand button row
+            const expandRow = document.createElement('tr');
+            expandRow.className = 'diff-expand-row';
+
+            // Determine the number of columns (side-by-side has multiple)
+            const colCount = group.rows[0].querySelectorAll('td').length || 5;
+
+            const expandTd = document.createElement('td');
+            expandTd.colSpan = colCount;
+            expandTd.className = 'diff-expand-cell';
+            expandTd.innerHTML = `
+                <button class="diff-expand-btn" data-expanded="false">
+                    <span class="diff-expand-icon">▸</span>
+                    <span class="diff-expand-text">${hiddenCount} lines hidden</span>
+                </button>
+            `;
+
+            expandRow.appendChild(expandTd);
+
+            // Insert expand row after the last kept top row (or at start of group)
+            const insertAfter = keepTop > 0 ? group.rows[keepTop - 1] : null;
+            if (insertAfter) {
+                insertAfter.parentNode.insertBefore(expandRow, insertAfter.nextSibling);
+            } else if (group.rows[0]) {
+                group.rows[0].parentNode.insertBefore(expandRow, group.rows[0]);
+            }
+
+            // Store reference to collapsed rows on the expand row
+            expandRow._collapsedRows = collapsedRows;
+
+            // Setup click handler
+            const expandBtn = expandRow.querySelector('.diff-expand-btn');
+            expandBtn.addEventListener('click', () => {
+                const isExpanded = expandBtn.dataset.expanded === 'true';
+                const icon = expandBtn.querySelector('.diff-expand-icon');
+                const text = expandBtn.querySelector('.diff-expand-text');
+
+                if (isExpanded) {
+                    // Collapse
+                    expandRow._collapsedRows.forEach(row => {
+                        row.style.display = 'none';
+                    });
+                    expandBtn.dataset.expanded = 'false';
+                    icon.textContent = '▸';
+                    text.textContent = `${hiddenCount} lines hidden`;
+                } else {
+                    // Expand
+                    expandRow._collapsedRows.forEach(row => {
+                        row.style.display = '';
+                    });
+                    expandBtn.dataset.expanded = 'true';
+                    icon.textContent = '▾';
+                    text.textContent = `${hiddenCount} lines shown`;
+                }
+            });
+        }
     }
 
     // Detect programming language from tab metadata or diff content
