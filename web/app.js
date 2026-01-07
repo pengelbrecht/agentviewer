@@ -611,21 +611,7 @@
                         outputFormat: 'side-by-side',
                         renderNothingWhenEmpty: false,
                         colorScheme: 'auto',
-                        highlight: true,
-                        rawTemplates: {
-                            'side-by-side-file-diff': `
-                                <div id="{{fileHtmlId}}" class="d2h-file-wrapper" data-lang="{{file.language}}">
-                                    <div class="d2h-file-diff">
-                                        <div class="d2h-code-wrapper">
-                                            <table class="d2h-diff-table">
-                                                <tbody class="d2h-diff-tbody">
-                                                {{{diffs}}}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>`
-                        }
+                        highlight: true
                     });
 
                     // Draw the diff
