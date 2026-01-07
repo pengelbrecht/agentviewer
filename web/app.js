@@ -303,6 +303,18 @@
                 html = `<div class="content-diff">${renderDiff(tab.content, tab)}</div>`;
                 break;
 
+            case 'mermaid':
+                html = `<div class="content-mermaid">${renderMermaid(tab.content)}</div>`;
+                break;
+
+            case 'image':
+                html = `<div class="content-image">${renderImage(tab.content, tab.title)}</div>`;
+                break;
+
+            case 'csv':
+                html = `<div class="content-csv">${renderCSV(tab.content, tab.title)}</div>`;
+                break;
+
             default:
                 html = `<pre class="content-plain">${escapeHtml(tab.content)}</pre>`;
         }
@@ -591,6 +603,312 @@
                 `<tr class="code-line"><td class="line-number">${i + 1}</td><td class="line-content">${line || ' '}</td></tr>`
             ).join('')
         }</tbody></table>`;
+    }
+
+    // Render standalone mermaid diagram (for .mmd/.mermaid files)
+    function renderMermaid(content) {
+        // Generate a unique ID for the mermaid diagram
+        const containerId = 'mermaid-standalone-' + Date.now();
+
+        // Schedule rendering after the element is in the DOM
+        setTimeout(() => {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            if (typeof mermaid !== 'undefined') {
+                mermaid.render(`mermaid-render-${Date.now()}`, content).then(result => {
+                    container.innerHTML = result.svg;
+                    container.classList.add('mermaid-rendered');
+                }).catch(err => {
+                    console.error('Mermaid render error:', err);
+                    container.innerHTML = `<div class="mermaid-error">
+                        <h3>Mermaid Diagram Error</h3>
+                        <p>${escapeHtml(err.message || String(err))}</p>
+                        <pre>${escapeHtml(content)}</pre>
+                    </div>`;
+                });
+            } else {
+                // Mermaid library not available, show raw content
+                container.innerHTML = `<div class="mermaid-fallback">
+                    <p>Mermaid library not loaded</p>
+                    <pre>${escapeHtml(content)}</pre>
+                </div>`;
+            }
+        }, 0);
+
+        return `<div id="${containerId}" class="mermaid-container"></div>`;
+    }
+
+    // Parse CSV content into a 2D array
+    // Handles quoted fields, escaped quotes, and various line endings
+    function parseCSV(content) {
+        const rows = [];
+        let currentRow = [];
+        let currentField = '';
+        let inQuotes = false;
+        let i = 0;
+
+        while (i < content.length) {
+            const char = content[i];
+            const nextChar = content[i + 1];
+
+            if (inQuotes) {
+                if (char === '"') {
+                    if (nextChar === '"') {
+                        // Escaped quote ("") -> single quote
+                        currentField += '"';
+                        i += 2;
+                        continue;
+                    } else {
+                        // End of quoted field
+                        inQuotes = false;
+                        i++;
+                        continue;
+                    }
+                } else {
+                    currentField += char;
+                    i++;
+                    continue;
+                }
+            } else {
+                if (char === '"' && currentField === '') {
+                    // Start of quoted field
+                    inQuotes = true;
+                    i++;
+                    continue;
+                } else if (char === ',') {
+                    // End of field
+                    currentRow.push(currentField);
+                    currentField = '';
+                    i++;
+                    continue;
+                } else if (char === '\r' && nextChar === '\n') {
+                    // CRLF line ending
+                    currentRow.push(currentField);
+                    rows.push(currentRow);
+                    currentRow = [];
+                    currentField = '';
+                    i += 2;
+                    continue;
+                } else if (char === '\n' || char === '\r') {
+                    // LF or CR line ending
+                    currentRow.push(currentField);
+                    rows.push(currentRow);
+                    currentRow = [];
+                    currentField = '';
+                    i++;
+                    continue;
+                } else {
+                    currentField += char;
+                    i++;
+                    continue;
+                }
+            }
+        }
+
+        // Handle last field/row
+        if (currentField !== '' || currentRow.length > 0) {
+            currentRow.push(currentField);
+            rows.push(currentRow);
+        }
+
+        return rows;
+    }
+
+    // Render CSV content as an interactive table
+    function renderCSV(content, title) {
+        if (!content || content.trim() === '') {
+            return `<div class="csv-error">
+                <h3>No CSV Content</h3>
+                <p>The CSV content is empty or unavailable.</p>
+            </div>`;
+        }
+
+        const rows = parseCSV(content);
+        if (rows.length === 0) {
+            return `<div class="csv-error">
+                <h3>Empty CSV</h3>
+                <p>The CSV file contains no data.</p>
+            </div>`;
+        }
+
+        // Assume first row is headers
+        const headers = rows[0];
+        const dataRows = rows.slice(1);
+
+        // Generate unique ID for the table
+        const tableId = 'csv-table-' + Date.now();
+
+        // Build header row with sortable columns
+        const headerHtml = headers.map((h, i) =>
+            `<th class="csv-header" data-col="${i}" data-sort-dir="none">
+                <span class="csv-header-text">${escapeHtml(h)}</span>
+                <span class="csv-sort-icon">⇅</span>
+            </th>`
+        ).join('');
+
+        // Build data rows
+        const bodyHtml = dataRows.map((row, rowIndex) => {
+            const cells = headers.map((_, colIndex) => {
+                const value = row[colIndex] !== undefined ? row[colIndex] : '';
+                return `<td class="csv-cell" data-col="${colIndex}">${escapeHtml(value)}</td>`;
+            }).join('');
+            return `<tr class="csv-row" data-row="${rowIndex}">${cells}</tr>`;
+        }).join('');
+
+        // Schedule interactive setup after DOM update
+        setTimeout(() => {
+            setupCSVTable(tableId, rows);
+        }, 0);
+
+        return `<div class="csv-container">
+            <div class="csv-toolbar">
+                <input type="text" class="csv-search" placeholder="Search..." data-table="${tableId}" />
+                <span class="csv-row-count">${dataRows.length} row${dataRows.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div class="csv-table-wrapper">
+                <table id="${tableId}" class="csv-table">
+                    <thead><tr>${headerHtml}</tr></thead>
+                    <tbody>${bodyHtml}</tbody>
+                </table>
+            </div>
+        </div>`;
+    }
+
+    // Setup interactive features for CSV table
+    function setupCSVTable(tableId, originalRows) {
+        const table = document.getElementById(tableId);
+        if (!table) return;
+
+        const container = table.closest('.csv-container');
+        const searchInput = container.querySelector('.csv-search');
+        const rowCountEl = container.querySelector('.csv-row-count');
+        const headers = originalRows[0];
+        let dataRows = originalRows.slice(1);
+        let sortCol = -1;
+        let sortDir = 'none'; // 'none', 'asc', 'desc'
+
+        // Setup column sorting
+        table.querySelectorAll('.csv-header').forEach(th => {
+            th.addEventListener('click', () => {
+                const col = parseInt(th.dataset.col, 10);
+
+                // Update sort direction
+                if (sortCol === col) {
+                    sortDir = sortDir === 'none' ? 'asc' : (sortDir === 'asc' ? 'desc' : 'none');
+                } else {
+                    sortCol = col;
+                    sortDir = 'asc';
+                }
+
+                // Update header UI
+                table.querySelectorAll('.csv-header').forEach(h => {
+                    h.dataset.sortDir = 'none';
+                    h.querySelector('.csv-sort-icon').textContent = '⇅';
+                });
+                th.dataset.sortDir = sortDir;
+                th.querySelector('.csv-sort-icon').textContent =
+                    sortDir === 'asc' ? '↑' : (sortDir === 'desc' ? '↓' : '⇅');
+
+                // Sort and re-render
+                renderTableBody();
+            });
+        });
+
+        // Setup search filtering
+        searchInput.addEventListener('input', () => {
+            renderTableBody();
+        });
+
+        function renderTableBody() {
+            const query = searchInput.value.toLowerCase().trim();
+            let rows = [...dataRows];
+
+            // Filter
+            if (query) {
+                rows = rows.filter(row =>
+                    row.some(cell => (cell || '').toLowerCase().includes(query))
+                );
+            }
+
+            // Sort
+            if (sortDir !== 'none' && sortCol >= 0) {
+                rows.sort((a, b) => {
+                    const valA = (a[sortCol] || '').toLowerCase();
+                    const valB = (b[sortCol] || '').toLowerCase();
+
+                    // Try numeric sort first
+                    const numA = parseFloat(valA);
+                    const numB = parseFloat(valB);
+                    if (!isNaN(numA) && !isNaN(numB)) {
+                        return sortDir === 'asc' ? numA - numB : numB - numA;
+                    }
+
+                    // Fall back to string sort
+                    const cmp = valA.localeCompare(valB);
+                    return sortDir === 'asc' ? cmp : -cmp;
+                });
+            }
+
+            // Render
+            const tbody = table.querySelector('tbody');
+            tbody.innerHTML = rows.map((row, rowIndex) => {
+                const cells = headers.map((_, colIndex) => {
+                    const value = row[colIndex] !== undefined ? row[colIndex] : '';
+                    // Highlight matching text if searching
+                    let displayValue = escapeHtml(value);
+                    if (query && value.toLowerCase().includes(query)) {
+                        const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
+                        displayValue = displayValue.replace(regex, '<mark class="csv-match">$1</mark>');
+                    }
+                    return `<td class="csv-cell" data-col="${colIndex}">${displayValue}</td>`;
+                }).join('');
+                return `<tr class="csv-row" data-row="${rowIndex}">${cells}</tr>`;
+            }).join('');
+
+            // Update row count
+            rowCountEl.textContent = `${rows.length} of ${dataRows.length} row${dataRows.length !== 1 ? 's' : ''}`;
+            if (rows.length === dataRows.length) {
+                rowCountEl.textContent = `${dataRows.length} row${dataRows.length !== 1 ? 's' : ''}`;
+            }
+        }
+    }
+
+    // Escape regex special characters
+    function escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // Render image content (expects a data URL or URL string)
+    function renderImage(content, title) {
+        // Handle empty content
+        if (!content) {
+            return `<div class="image-error">
+                <h3>No Image Content</h3>
+                <p>The image content is empty or unavailable.</p>
+            </div>`;
+        }
+
+        // Create the image element with appropriate alt text
+        const altText = title ? escapeHtml(title) : 'Image';
+
+        // Check if content is a data URL or a regular URL
+        const isDataUrl = content.startsWith('data:');
+        const isUrl = content.startsWith('http://') || content.startsWith('https://') || content.startsWith('/');
+
+        if (!isDataUrl && !isUrl) {
+            // Content might be raw base64, try to wrap it
+            // Attempt to detect image type from magic bytes or default to png
+            return `<div class="image-error">
+                <h3>Invalid Image Format</h3>
+                <p>The image content is not in a recognized format (expected data URL or URL).</p>
+            </div>`;
+        }
+
+        return `<figure class="image-figure">
+            <img src="${content}" alt="${altText}" class="image-display" loading="lazy" />
+            ${title ? `<figcaption class="image-caption">${escapeHtml(title)}</figcaption>` : ''}
+        </figure>`;
     }
 
     // Render diff using diff2html-ui for side-by-side view with syntax highlighting

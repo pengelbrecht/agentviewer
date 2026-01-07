@@ -64,6 +64,36 @@ func TestDetectContentType(t *testing.T) {
 			content:  "",
 			expected: TabTypeDiff,
 		},
+		{
+			name:     "mermaid file .mmd extension",
+			filename: "diagram.mmd",
+			content:  "graph TD\n    A --> B",
+			expected: TabTypeMermaid,
+		},
+		{
+			name:     "mermaid file .mermaid extension",
+			filename: "flowchart.mermaid",
+			content:  "sequenceDiagram\n    Alice->>Bob: Hello",
+			expected: TabTypeMermaid,
+		},
+		{
+			name:     "mermaid file uppercase MMD",
+			filename: "DIAGRAM.MMD",
+			content:  "",
+			expected: TabTypeMermaid,
+		},
+		{
+			name:     "mermaid file uppercase MERMAID",
+			filename: "CHART.MERMAID",
+			content:  "",
+			expected: TabTypeMermaid,
+		},
+		{
+			name:     "mermaid file mixed case",
+			filename: "flow.Mmd",
+			content:  "",
+			expected: TabTypeMermaid,
+		},
 
 		// Code files - extension overrides content
 		{
@@ -375,6 +405,20 @@ func TestDetectContentType_ExtensionPriority(t *testing.T) {
 		result := DetectContentType("file.go", "--- old\n+++ new")
 		if result != TabTypeCode {
 			t.Errorf("Expected code for .go file, got %v", result)
+		}
+	})
+
+	t.Run("mermaid extension beats markdown content", func(t *testing.T) {
+		result := DetectContentType("diagram.mmd", "# Header\n## Another header")
+		if result != TabTypeMermaid {
+			t.Errorf("Expected mermaid for .mmd file, got %v", result)
+		}
+	})
+
+	t.Run("mermaid extension beats code content", func(t *testing.T) {
+		result := DetectContentType("flow.mermaid", "package main\nfunc main() {}")
+		if result != TabTypeMermaid {
+			t.Errorf("Expected mermaid for .mermaid file, got %v", result)
 		}
 	})
 }
@@ -1743,6 +1787,278 @@ func TestFileAccessLogging(t *testing.T) {
 
 		if logBuffer.Len() > 0 {
 			t.Errorf("Expected no log output when logging disabled, got: %s", logBuffer.String())
+		}
+	})
+}
+
+func TestDetectContentType_CSV(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		expected TabType
+	}{
+		{"csv lowercase", "data.csv", TabTypeCSV},
+		{"csv uppercase", "DATA.CSV", TabTypeCSV},
+		{"csv mixed case", "Data.Csv", TabTypeCSV},
+		{"csv with path", "/path/to/data.csv", TabTypeCSV},
+		{"csv relative path", "./reports/sales.csv", TabTypeCSV},
+		{"csv complex filename", "2024-01-report_data.csv", TabTypeCSV},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := DetectContentType(tt.filename, "")
+			if result != tt.expected {
+				t.Errorf("DetectContentType(%q, \"\") = %v, want %v",
+					tt.filename, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDetectContentType_Images(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		expected TabType
+	}{
+		{"png lowercase", "image.png", TabTypeImage},
+		{"png uppercase", "IMAGE.PNG", TabTypeImage},
+		{"jpg lowercase", "photo.jpg", TabTypeImage},
+		{"jpg uppercase", "PHOTO.JPG", TabTypeImage},
+		{"jpeg lowercase", "photo.jpeg", TabTypeImage},
+		{"jpeg uppercase", "PHOTO.JPEG", TabTypeImage},
+		{"gif lowercase", "animation.gif", TabTypeImage},
+		{"gif uppercase", "ANIMATION.GIF", TabTypeImage},
+		{"svg lowercase", "icon.svg", TabTypeImage},
+		{"svg uppercase", "ICON.SVG", TabTypeImage},
+		{"webp lowercase", "image.webp", TabTypeImage},
+		{"webp uppercase", "IMAGE.WEBP", TabTypeImage},
+		{"full path png", "/path/to/image.png", TabTypeImage},
+		{"full path jpg", "/home/user/photos/vacation.jpg", TabTypeImage},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := DetectContentType(tt.filename, "")
+			if result != tt.expected {
+				t.Errorf("DetectContentType(%q, \"\") = %v, want %v",
+					tt.filename, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsImageFile(t *testing.T) {
+	tests := []struct {
+		filename string
+		expected bool
+	}{
+		// Image files
+		{"image.png", true},
+		{"photo.jpg", true},
+		{"photo.jpeg", true},
+		{"animation.gif", true},
+		{"icon.svg", true},
+		{"image.webp", true},
+		// Case insensitive
+		{"IMAGE.PNG", true},
+		{"PHOTO.JPG", true},
+		{"PHOTO.JPEG", true},
+		// Full paths
+		{"/path/to/image.png", true},
+		{"./relative/photo.jpg", true},
+		// Non-image files
+		{"document.pdf", false},
+		{"script.js", false},
+		{"style.css", false},
+		{"readme.md", false},
+		{"file.txt", false},
+		{"archive.zip", false},
+		// Edge cases
+		{"", false},
+		{".", false},
+		{".png", true},
+		{"noextension", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.filename, func(t *testing.T) {
+			result := IsImageFile(tt.filename)
+			if result != tt.expected {
+				t.Errorf("IsImageFile(%q) = %v, want %v",
+					tt.filename, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetImageMIMEType(t *testing.T) {
+	tests := []struct {
+		filename string
+		expected string
+	}{
+		{"image.png", "image/png"},
+		{"IMAGE.PNG", "image/png"},
+		{"photo.jpg", "image/jpeg"},
+		{"photo.jpeg", "image/jpeg"},
+		{"PHOTO.JPEG", "image/jpeg"},
+		{"animation.gif", "image/gif"},
+		{"icon.svg", "image/svg+xml"},
+		{"image.webp", "image/webp"},
+		// Full paths
+		{"/path/to/image.png", "image/png"},
+		{"./relative/photo.jpg", "image/jpeg"},
+		// Unknown returns octet-stream
+		{"file.txt", "application/octet-stream"},
+		{"unknown.xyz", "application/octet-stream"},
+		{"", "application/octet-stream"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.filename, func(t *testing.T) {
+			result := GetImageMIMEType(tt.filename)
+			if result != tt.expected {
+				t.Errorf("GetImageMIMEType(%q) = %q, want %q",
+					tt.filename, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestReadImageAsDataURL(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Save original config and restore after test
+	originalConfig := GetFileAccessConfig()
+	defer SetFileAccessConfig(originalConfig)
+	SetFileAccessConfig(&FileAccessConfig{AllowedDirs: nil, LogAccess: false})
+
+	t.Run("read png file", func(t *testing.T) {
+		// Create a minimal valid PNG file (8x8 red square)
+		// PNG header + IHDR chunk (minimal)
+		pngData := []byte{
+			0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+			0x00, 0x00, 0x00, 0x0D, // IHDR chunk length
+			0x49, 0x48, 0x44, 0x52, // IHDR
+			0x00, 0x00, 0x00, 0x01, // width: 1
+			0x00, 0x00, 0x00, 0x01, // height: 1
+			0x08, 0x02, // bit depth 8, color type 2 (RGB)
+			0x00, 0x00, 0x00, // compression, filter, interlace
+			0x90, 0x77, 0x53, 0xDE, // CRC
+			0x00, 0x00, 0x00, 0x0C, // IDAT chunk length
+			0x49, 0x44, 0x41, 0x54, // IDAT
+			0x08, 0xD7, 0x63, 0xF8, 0xFF, 0xFF, 0x3F, 0x00, 0x05, 0xFE, 0x02, 0xFE, // compressed data
+			0xA3, 0x6D, 0xED, 0xC6, // CRC
+			0x00, 0x00, 0x00, 0x00, // IEND chunk length
+			0x49, 0x45, 0x4E, 0x44, // IEND
+			0xAE, 0x42, 0x60, 0x82, // CRC
+		}
+
+		path := filepath.Join(tmpDir, "test.png")
+		err := os.WriteFile(path, pngData, 0644)
+		if err != nil {
+			t.Fatalf("Failed to create test PNG: %v", err)
+		}
+
+		result, err := ReadImageAsDataURL(path)
+		if err != nil {
+			t.Fatalf("ReadImageAsDataURL failed: %v", err)
+		}
+
+		if !strings.HasPrefix(result, "data:image/png;base64,") {
+			t.Errorf("Expected data URL to start with 'data:image/png;base64,', got prefix: %s",
+				result[:min(len(result), 30)])
+		}
+	})
+
+	t.Run("read jpg file", func(t *testing.T) {
+		// Minimal JPEG data (SOI + EOI markers)
+		jpgData := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0xFF, 0xD9}
+
+		path := filepath.Join(tmpDir, "test.jpg")
+		err := os.WriteFile(path, jpgData, 0644)
+		if err != nil {
+			t.Fatalf("Failed to create test JPG: %v", err)
+		}
+
+		result, err := ReadImageAsDataURL(path)
+		if err != nil {
+			t.Fatalf("ReadImageAsDataURL failed: %v", err)
+		}
+
+		if !strings.HasPrefix(result, "data:image/jpeg;base64,") {
+			t.Errorf("Expected data URL to start with 'data:image/jpeg;base64,', got prefix: %s",
+				result[:min(len(result), 30)])
+		}
+	})
+
+	t.Run("read svg file", func(t *testing.T) {
+		svgData := `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+			<circle cx="50" cy="50" r="40" fill="red"/>
+		</svg>`
+
+		path := filepath.Join(tmpDir, "test.svg")
+		err := os.WriteFile(path, []byte(svgData), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create test SVG: %v", err)
+		}
+
+		result, err := ReadImageAsDataURL(path)
+		if err != nil {
+			t.Fatalf("ReadImageAsDataURL failed: %v", err)
+		}
+
+		if !strings.HasPrefix(result, "data:image/svg+xml;base64,") {
+			t.Errorf("Expected data URL to start with 'data:image/svg+xml;base64,', got prefix: %s",
+				result[:min(len(result), 30)])
+		}
+	})
+
+	t.Run("non-existent file", func(t *testing.T) {
+		path := filepath.Join(tmpDir, "nonexistent.png")
+		_, err := ReadImageAsDataURL(path)
+		if err == nil {
+			t.Error("Expected error for non-existent file")
+		}
+		if !strings.Contains(err.Error(), "not found") {
+			t.Errorf("Expected 'not found' error, got: %v", err)
+		}
+	})
+
+	t.Run("directory instead of file", func(t *testing.T) {
+		dirPath := filepath.Join(tmpDir, "testdir.png")
+		os.MkdirAll(dirPath, 0755)
+
+		_, err := ReadImageAsDataURL(dirPath)
+		if err == nil {
+			t.Error("Expected error for directory")
+		}
+		if !strings.Contains(err.Error(), "directory") {
+			t.Errorf("Expected 'directory' error, got: %v", err)
+		}
+	})
+
+	t.Run("non-image file", func(t *testing.T) {
+		path := filepath.Join(tmpDir, "test.txt")
+		err := os.WriteFile(path, []byte("hello"), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create test file: %v", err)
+		}
+
+		_, err = ReadImageAsDataURL(path)
+		if err == nil {
+			t.Error("Expected error for non-image file")
+		}
+		if !strings.Contains(err.Error(), "not a recognized image format") {
+			t.Errorf("Expected 'not a recognized image format' error, got: %v", err)
+		}
+	})
+
+	t.Run("empty path", func(t *testing.T) {
+		_, err := ReadImageAsDataURL("")
+		if err == nil {
+			t.Error("Expected error for empty path")
 		}
 	})
 }
