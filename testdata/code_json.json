@@ -1,0 +1,390 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/agentviewer-test-schema.json",
+  "title": "JSON Code Test File",
+  "description": "Tests syntax highlighting for JSON language features",
+
+  "metadata": {
+    "version": "1.0.0",
+    "author": "Test Author",
+    "created": "2024-01-15T10:30:00Z",
+    "updated": "2024-01-15T15:45:00Z",
+    "tags": ["test", "sample", "code-highlighting"]
+  },
+
+  "scalars": {
+    "string": "Hello World",
+    "stringWithEscapes": "Hello \"World\"\nNew line\tTab\\Backslash",
+    "unicode": "Hello 世界 🌍",
+    "empty": "",
+
+    "positiveInteger": 42,
+    "negativeInteger": -17,
+    "zero": 0,
+    "largeNumber": 9007199254740991,
+    "float": 3.14159,
+    "negativeFloat": -2.71828,
+    "exponential": 6.022e23,
+    "negativeExponential": 1.6e-19,
+
+    "booleanTrue": true,
+    "booleanFalse": false,
+
+    "nullValue": null
+  },
+
+  "arrays": {
+    "empty": [],
+    "numbers": [1, 2, 3, 4, 5],
+    "strings": ["apple", "banana", "cherry"],
+    "mixed": [1, "two", true, null, { "nested": "object" }],
+    "nested": [
+      [1, 2, 3],
+      [4, 5, 6],
+      [7, 8, 9]
+    ],
+    "complex": [
+      {
+        "id": 1,
+        "name": "First",
+        "active": true
+      },
+      {
+        "id": 2,
+        "name": "Second",
+        "active": false
+      },
+      {
+        "id": 3,
+        "name": "Third",
+        "active": true
+      }
+    ]
+  },
+
+  "objects": {
+    "empty": {},
+    "simple": {
+      "key1": "value1",
+      "key2": "value2"
+    },
+    "nested": {
+      "level1": {
+        "level2": {
+          "level3": {
+            "deepValue": "Found at level 3"
+          }
+        }
+      }
+    },
+    "withSpecialKeys": {
+      "key-with-dash": "value",
+      "key_with_underscore": "value",
+      "key.with.dots": "value",
+      "123numeric": "value",
+      "": "empty key",
+      "key with spaces": "value"
+    }
+  },
+
+  "users": [
+    {
+      "id": "usr_001",
+      "username": "johndoe",
+      "email": "john@example.com",
+      "profile": {
+        "firstName": "John",
+        "lastName": "Doe",
+        "avatar": "https://example.com/avatars/johndoe.png",
+        "bio": "Software developer with 10+ years of experience",
+        "location": {
+          "city": "San Francisco",
+          "state": "CA",
+          "country": "USA",
+          "coordinates": {
+            "latitude": 37.7749,
+            "longitude": -122.4194
+          }
+        }
+      },
+      "preferences": {
+        "theme": "dark",
+        "language": "en-US",
+        "notifications": {
+          "email": true,
+          "push": false,
+          "sms": false
+        },
+        "privacy": {
+          "showEmail": false,
+          "showLocation": true,
+          "searchable": true
+        }
+      },
+      "roles": ["user", "contributor"],
+      "permissions": {
+        "read": ["posts", "comments", "profiles"],
+        "write": ["posts", "comments"],
+        "delete": ["own-posts", "own-comments"]
+      },
+      "stats": {
+        "posts": 42,
+        "followers": 1337,
+        "following": 256,
+        "likes": 9999
+      },
+      "createdAt": "2020-03-15T08:30:00Z",
+      "updatedAt": "2024-01-10T14:22:00Z",
+      "lastLoginAt": "2024-01-15T09:00:00Z",
+      "active": true,
+      "verified": true,
+      "deletedAt": null
+    },
+    {
+      "id": "usr_002",
+      "username": "janesmith",
+      "email": "jane@example.com",
+      "profile": {
+        "firstName": "Jane",
+        "lastName": "Smith",
+        "avatar": null,
+        "bio": null,
+        "location": null
+      },
+      "preferences": {
+        "theme": "light",
+        "language": "en-GB",
+        "notifications": {
+          "email": true,
+          "push": true,
+          "sms": false
+        },
+        "privacy": {
+          "showEmail": true,
+          "showLocation": false,
+          "searchable": true
+        }
+      },
+      "roles": ["user", "admin", "moderator"],
+      "permissions": {
+        "read": ["*"],
+        "write": ["*"],
+        "delete": ["*"]
+      },
+      "stats": {
+        "posts": 156,
+        "followers": 5432,
+        "following": 128,
+        "likes": 25000
+      },
+      "createdAt": "2019-08-22T12:00:00Z",
+      "updatedAt": "2024-01-14T18:45:00Z",
+      "lastLoginAt": "2024-01-15T10:30:00Z",
+      "active": true,
+      "verified": true,
+      "deletedAt": null
+    }
+  ],
+
+  "api": {
+    "endpoints": [
+      {
+        "method": "GET",
+        "path": "/api/v1/users",
+        "description": "List all users",
+        "authentication": "required",
+        "rateLimit": {
+          "requests": 100,
+          "window": "1m"
+        },
+        "parameters": {
+          "query": [
+            {
+              "name": "page",
+              "type": "integer",
+              "required": false,
+              "default": 1
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false,
+              "default": 20,
+              "min": 1,
+              "max": 100
+            },
+            {
+              "name": "sort",
+              "type": "string",
+              "required": false,
+              "enum": ["createdAt", "updatedAt", "username"]
+            }
+          ]
+        },
+        "response": {
+          "success": {
+            "status": 200,
+            "body": {
+              "data": "array<User>",
+              "pagination": {
+                "page": "integer",
+                "limit": "integer",
+                "total": "integer",
+                "hasMore": "boolean"
+              }
+            }
+          },
+          "errors": [
+            { "status": 401, "message": "Unauthorized" },
+            { "status": 429, "message": "Rate limit exceeded" },
+            { "status": 500, "message": "Internal server error" }
+          ]
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/users",
+        "description": "Create a new user",
+        "authentication": "required",
+        "permissions": ["users:create"],
+        "body": {
+          "contentType": "application/json",
+          "schema": {
+            "username": {
+              "type": "string",
+              "required": true,
+              "minLength": 3,
+              "maxLength": 50,
+              "pattern": "^[a-z0-9_]+$"
+            },
+            "email": {
+              "type": "string",
+              "required": true,
+              "format": "email"
+            },
+            "password": {
+              "type": "string",
+              "required": true,
+              "minLength": 8
+            }
+          }
+        }
+      }
+    ]
+  },
+
+  "config": {
+    "server": {
+      "host": "0.0.0.0",
+      "port": 8080,
+      "timeout": 30000,
+      "keepAlive": true,
+      "cors": {
+        "enabled": true,
+        "origins": ["http://localhost:3000", "https://app.example.com"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "headers": ["Content-Type", "Authorization", "X-Request-ID"]
+      },
+      "compression": {
+        "enabled": true,
+        "threshold": 1024,
+        "level": 6
+      }
+    },
+    "database": {
+      "type": "postgresql",
+      "host": "localhost",
+      "port": 5432,
+      "name": "myapp",
+      "pool": {
+        "min": 2,
+        "max": 10,
+        "idle": 10000
+      },
+      "ssl": {
+        "enabled": true,
+        "rejectUnauthorized": false
+      }
+    },
+    "cache": {
+      "type": "redis",
+      "host": "localhost",
+      "port": 6379,
+      "ttl": 3600,
+      "prefix": "myapp:"
+    },
+    "logging": {
+      "level": "info",
+      "format": "json",
+      "outputs": ["stdout", "file"],
+      "file": {
+        "path": "/var/log/myapp/app.log",
+        "maxSize": "100MB",
+        "maxFiles": 10
+      }
+    },
+    "features": {
+      "darkMode": true,
+      "betaFeatures": false,
+      "experimentalApi": false,
+      "maintenance": false
+    }
+  },
+
+  "geoJSON": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [-122.4194, 37.7749]
+        },
+        "properties": {
+          "name": "San Francisco",
+          "population": 873965
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [-122.5, 37.7],
+              [-122.5, 37.8],
+              [-122.4, 37.8],
+              [-122.4, 37.7],
+              [-122.5, 37.7]
+            ]
+          ]
+        },
+        "properties": {
+          "name": "Sample Area",
+          "type": "boundary"
+        }
+      }
+    ]
+  },
+
+  "packageInfo": {
+    "name": "@example/agentviewer-test",
+    "version": "1.0.0",
+    "description": "A sample JSON file for testing",
+    "main": "index.js",
+    "scripts": {
+      "start": "node index.js",
+      "test": "jest",
+      "build": "webpack --mode production",
+      "lint": "eslint src/"
+    },
+    "dependencies": {
+      "express": "^4.18.2",
+      "lodash": "^4.17.21"
+    },
+    "devDependencies": {
+      "jest": "^29.7.0",
+      "eslint": "^8.56.0"
+    }
+  }
+}

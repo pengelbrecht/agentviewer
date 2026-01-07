@@ -1,0 +1,370 @@
+# YAML Code Test File - Tests syntax highlighting for YAML language features
+# This file demonstrates various YAML constructs for testing code rendering
+
+---
+# Document start marker
+
+# Scalar types
+scalars:
+  string: Hello World
+  quoted_string: "Hello \"quoted\" World"
+  single_quoted: 'Hello ''single-quoted'' World'
+  multiline_literal: |
+    This is a literal block scalar.
+    Line breaks are preserved.
+    Indentation is kept.
+  multiline_folded: >
+    This is a folded block scalar.
+    Line breaks become spaces.
+    Only double newlines create paragraphs.
+
+  integer: 42
+  negative: -17
+  octal: 0o755
+  hex: 0xFF
+  float: 3.14159
+  exponential: 6.022e23
+  infinity: .inf
+  negative_infinity: -.inf
+  not_a_number: .nan
+
+  boolean_true: true
+  boolean_false: false
+  yes_value: yes
+  no_value: no
+
+  null_value: null
+  tilde_null: ~
+  empty_null:
+
+  date: 2024-01-15
+  datetime: 2024-01-15T10:30:00Z
+  datetime_offset: 2024-01-15T10:30:00+05:00
+
+# Collections
+collections:
+  # Inline (flow) sequence
+  flow_sequence: [one, two, three, four, five]
+
+  # Block sequence
+  block_sequence:
+    - first item
+    - second item
+    - third item
+    - nested sequence:
+        - nested item 1
+        - nested item 2
+
+  # Inline (flow) mapping
+  flow_mapping: {name: John, age: 30, active: true}
+
+  # Block mapping
+  block_mapping:
+    name: John Doe
+    email: john@example.com
+    age: 30
+    active: true
+    roles:
+      - admin
+      - user
+
+  # Complex keys
+  ? - complex
+    - key
+  : complex value
+
+  # Nested structures
+  nested:
+    level1:
+      level2:
+        level3:
+          deep_value: Found at level 3
+          deep_list:
+            - a
+            - b
+            - c
+
+# Anchors and aliases
+defaults: &default_settings
+  timeout: 30
+  retries: 3
+  debug: false
+  log_level: info
+
+development:
+  <<: *default_settings  # Merge key
+  debug: true
+  log_level: debug
+  database: &dev_db
+    host: localhost
+    port: 5432
+    name: dev_db
+
+staging:
+  <<: *default_settings
+  database:
+    <<: *dev_db
+    host: staging.db.example.com
+    name: staging_db
+
+production:
+  <<: *default_settings
+  timeout: 60
+  database:
+    host: prod.db.example.com
+    port: 5432
+    name: prod_db
+    replicas:
+      - host: replica1.db.example.com
+      - host: replica2.db.example.com
+
+# Tags
+tagged_values:
+  explicit_string: !!str 123
+  explicit_int: !!int "456"
+  explicit_float: !!float "3.14"
+  explicit_bool: !!bool "true"
+  explicit_null: !!null ""
+  binary_data: !!binary |
+    R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7
+
+# Kubernetes-style configuration example
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+  namespace: production
+  labels:
+    app: myapp
+    version: v1.0.0
+    environment: production
+  annotations:
+    description: "Main application deployment"
+    owner: platform-team
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: myapp
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: myapp
+        version: v1.0.0
+    spec:
+      serviceAccountName: myapp-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: app
+          image: myapp:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: myapp-secrets
+                  key: database-url
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: config
+          configMap:
+            name: myapp-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: myapp-data
+
+# GitHub Actions workflow example
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+        os: [ubuntu-latest, macos-latest]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+        env:
+          CI: true
+          NODE_ENV: test
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://app.example.com
+    steps:
+      - name: Deploy
+        run: echo "Deploying to production"
+
+# Docker Compose example
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+    image: myapp:latest
+    container_name: myapp-web
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://user:pass@db:5432/myapp
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - frontend
+      - backend
+    volumes:
+      - ./config:/app/config:ro
+      - data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  db:
+    image: postgres:16-alpine
+    container_name: myapp-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: myapp
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d myapp"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: myapp-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - backend
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true
+
+volumes:
+  data:
+  postgres-data:
+  redis-data:
+
+# Special characters and edge cases
+special_characters:
+  with_colon: "value: with colon"
+  with_hash: "value # not a comment"
+  with_at: "@mention"
+  with_ampersand: "Tom & Jerry"
+  with_asterisk: "*emphasis*"
+  with_exclamation: "!important"
+  with_percent: "100%"
+  with_brackets: "[bracketed]"
+  with_braces: "{in braces}"
+  unicode: "Hello 世界 🌍"
+  emoji: "🚀 Rocket launch"
+
+# End of YAML test file
+...
