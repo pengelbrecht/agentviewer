@@ -26,6 +26,20 @@
                 <p>Waiting for content from AI agent...</p>
             </div>
         </main>
+        <!-- Search bar overlay -->
+        <div id="search-bar" class="search-bar hidden">
+            <input type="text" id="search-input" placeholder="Search in content..." autocomplete="off" />
+            <span id="search-count" class="search-count"></span>
+            <button id="search-prev" class="search-nav-btn" title="Previous match (Shift+Enter)">
+                <span>&#8593;</span>
+            </button>
+            <button id="search-next" class="search-nav-btn" title="Next match (Enter)">
+                <span>&#8595;</span>
+            </button>
+            <button id="search-close" class="search-close-btn" title="Close (Escape)">
+                <span>&times;</span>
+            </button>
+        </div>
     </div>
     <!-- Vendor JS -->
     <script src="/vendor/marked.min.js"></script>

@@ -12,6 +12,15 @@
     let closedTabsHistory = []; // Stack of closed tabs for reopen functionality
     const maxClosedTabs = 10; // Maximum number of closed tabs to remember
 
+    // Search state
+    let searchState = {
+        isOpen: false,
+        query: '',
+        matches: [],
+        currentIndex: -1,
+        originalContent: null // Store original content for restoring
+    };
+
     // DOM Elements
     const tabsContainer = document.getElementById('tabs-container');
     const contentArea = document.getElementById('content');
@@ -24,6 +33,7 @@
         loadTabs();
         setupKeyboardShortcuts();
         setupThemeToggle();
+        setupSearch();
     }
 
     // Theme management
@@ -1285,10 +1295,296 @@
         }
     }
 
+    // ========== Search functionality ==========
+
+    // Setup search bar and event handlers
+    function setupSearch() {
+        const searchBar = document.getElementById('search-bar');
+        const searchInput = document.getElementById('search-input');
+        const searchCount = document.getElementById('search-count');
+        const searchPrev = document.getElementById('search-prev');
+        const searchNext = document.getElementById('search-next');
+        const searchClose = document.getElementById('search-close');
+
+        if (!searchBar || !searchInput) return;
+
+        // Input handler for searching
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value;
+            searchState.query = query;
+            if (query.length > 0) {
+                performSearch(query);
+            } else {
+                clearSearchHighlights();
+                updateSearchCount(0, 0);
+            }
+        });
+
+        // Keyboard shortcuts within search input
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    navigateSearchPrev();
+                } else {
+                    navigateSearchNext();
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeSearch();
+            }
+        });
+
+        // Navigation buttons
+        searchPrev.addEventListener('click', navigateSearchPrev);
+        searchNext.addEventListener('click', navigateSearchNext);
+        searchClose.addEventListener('click', closeSearch);
+    }
+
+    // Open the search bar
+    function openSearch() {
+        const searchBar = document.getElementById('search-bar');
+        const searchInput = document.getElementById('search-input');
+
+        if (!searchBar || !searchInput) return;
+
+        searchBar.classList.remove('hidden');
+        searchState.isOpen = true;
+
+        // Focus and select existing text
+        searchInput.focus();
+        searchInput.select();
+
+        // If there's already a query, re-perform search
+        if (searchState.query) {
+            performSearch(searchState.query);
+        }
+    }
+
+    // Close the search bar
+    function closeSearch() {
+        const searchBar = document.getElementById('search-bar');
+
+        if (!searchBar) return;
+
+        searchBar.classList.add('hidden');
+        searchState.isOpen = false;
+
+        // Clear highlights when closing
+        clearSearchHighlights();
+    }
+
+    // Perform search and highlight matches
+    function performSearch(query) {
+        if (!query || query.length === 0) {
+            clearSearchHighlights();
+            return;
+        }
+
+        // Clear previous highlights
+        clearSearchHighlights();
+
+        // Find all text nodes in the content area
+        const contentArea = document.getElementById('content');
+        if (!contentArea) return;
+
+        // Create a TreeWalker to find text nodes
+        const walker = document.createTreeWalker(
+            contentArea,
+            NodeFilter.SHOW_TEXT,
+            {
+                acceptNode: function(node) {
+                    // Skip script and style tags
+                    const parent = node.parentNode;
+                    if (parent.tagName === 'SCRIPT' || parent.tagName === 'STYLE') {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    // Skip empty text nodes
+                    if (node.textContent.trim().length === 0) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            }
+        );
+
+        const textNodes = [];
+        let node;
+        while (node = walker.nextNode()) {
+            textNodes.push(node);
+        }
+
+        // Search and highlight within text nodes
+        const matches = [];
+        const queryLower = query.toLowerCase();
+
+        textNodes.forEach(textNode => {
+            const text = textNode.textContent;
+            const textLower = text.toLowerCase();
+            let startIndex = 0;
+            let foundIndex;
+
+            // Find all occurrences in this text node
+            const nodeMatches = [];
+            while ((foundIndex = textLower.indexOf(queryLower, startIndex)) !== -1) {
+                nodeMatches.push({
+                    textNode: textNode,
+                    start: foundIndex,
+                    end: foundIndex + query.length
+                });
+                startIndex = foundIndex + 1;
+            }
+
+            if (nodeMatches.length > 0) {
+                // Process matches in reverse order to avoid index shifting issues
+                nodeMatches.reverse().forEach(match => {
+                    matches.unshift(highlightMatch(match.textNode, match.start, match.end));
+                });
+            }
+        });
+
+        // Store matches and update state
+        searchState.matches = matches;
+        searchState.currentIndex = matches.length > 0 ? 0 : -1;
+
+        // Update count display
+        updateSearchCount(searchState.currentIndex + 1, matches.length);
+
+        // Highlight current match
+        if (matches.length > 0) {
+            highlightCurrentMatch();
+        }
+    }
+
+    // Highlight a single match and return the highlight element
+    function highlightMatch(textNode, start, end) {
+        const text = textNode.textContent;
+        const before = text.substring(0, start);
+        const match = text.substring(start, end);
+        const after = text.substring(end);
+
+        // Create highlight span
+        const highlightSpan = document.createElement('span');
+        highlightSpan.className = 'search-highlight';
+        highlightSpan.textContent = match;
+
+        // Create document fragment with before text, highlight, and after text
+        const fragment = document.createDocumentFragment();
+        if (before) {
+            fragment.appendChild(document.createTextNode(before));
+        }
+        fragment.appendChild(highlightSpan);
+        if (after) {
+            fragment.appendChild(document.createTextNode(after));
+        }
+
+        // Replace the text node with the fragment
+        textNode.parentNode.replaceChild(fragment, textNode);
+
+        return highlightSpan;
+    }
+
+    // Update the current match highlight
+    function highlightCurrentMatch() {
+        // Remove current class from all highlights
+        document.querySelectorAll('.search-highlight.current').forEach(el => {
+            el.classList.remove('current');
+        });
+
+        // Add current class to current match
+        if (searchState.currentIndex >= 0 && searchState.currentIndex < searchState.matches.length) {
+            const currentMatch = searchState.matches[searchState.currentIndex];
+            if (currentMatch) {
+                currentMatch.classList.add('current');
+                // Scroll into view
+                currentMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // Update count
+        updateSearchCount(searchState.currentIndex + 1, searchState.matches.length);
+    }
+
+    // Navigate to next match
+    function navigateSearchNext() {
+        if (searchState.matches.length === 0) return;
+
+        searchState.currentIndex = (searchState.currentIndex + 1) % searchState.matches.length;
+        highlightCurrentMatch();
+    }
+
+    // Navigate to previous match
+    function navigateSearchPrev() {
+        if (searchState.matches.length === 0) return;
+
+        searchState.currentIndex = searchState.currentIndex - 1;
+        if (searchState.currentIndex < 0) {
+            searchState.currentIndex = searchState.matches.length - 1;
+        }
+        highlightCurrentMatch();
+    }
+
+    // Update the search count display
+    function updateSearchCount(current, total) {
+        const searchCount = document.getElementById('search-count');
+        if (!searchCount) return;
+
+        if (total === 0) {
+            if (searchState.query && searchState.query.length > 0) {
+                searchCount.textContent = 'No results';
+                searchCount.classList.add('no-results');
+            } else {
+                searchCount.textContent = '';
+                searchCount.classList.remove('no-results');
+            }
+        } else {
+            searchCount.textContent = `${current} of ${total}`;
+            searchCount.classList.remove('no-results');
+        }
+    }
+
+    // Clear all search highlights
+    function clearSearchHighlights() {
+        searchState.matches = [];
+        searchState.currentIndex = -1;
+
+        // Find all highlight spans and replace them with their text content
+        const highlights = document.querySelectorAll('.search-highlight');
+        highlights.forEach(highlight => {
+            const textNode = document.createTextNode(highlight.textContent);
+            highlight.parentNode.replaceChild(textNode, highlight);
+        });
+
+        // Normalize text nodes (merge adjacent text nodes)
+        const contentArea = document.getElementById('content');
+        if (contentArea) {
+            contentArea.normalize();
+        }
+
+        updateSearchCount(0, 0);
+    }
+
     // Setup keyboard shortcuts
     function setupKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
             const isMod = e.metaKey || e.ctrlKey;
+
+            // Don't trigger shortcuts when typing in search input
+            if (e.target.id === 'search-input') return;
+
+            // Cmd/Ctrl + F or '/' to open search
+            if ((isMod && e.key === 'f') || (!isMod && e.key === '/' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA')) {
+                e.preventDefault();
+                openSearch();
+                return;
+            }
+
+            // Escape to close search (when not in search input)
+            if (e.key === 'Escape' && searchState.isOpen) {
+                e.preventDefault();
+                closeSearch();
+                return;
+            }
 
             // Cmd/Ctrl + Shift + T to reopen closed tab
             if (isMod && e.shiftKey && (e.key === 't' || e.key === 'T')) {
