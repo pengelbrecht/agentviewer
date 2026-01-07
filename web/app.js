@@ -332,6 +332,65 @@
                 renderKatexInContent();
             }
         }
+
+        if (type === 'code') {
+            // Setup copy button handlers
+            setupCopyButtons();
+        }
+    }
+
+    // Setup copy button click handlers
+    function setupCopyButtons() {
+        contentArea.querySelectorAll('.code-copy-btn').forEach((btn) => {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const encodedContent = btn.dataset.code;
+                if (!encodedContent) return;
+
+                try {
+                    // Decode the content
+                    const content = decodeURIComponent(atob(encodedContent));
+
+                    // Copy to clipboard
+                    await navigator.clipboard.writeText(content);
+
+                    // Show success state
+                    const copyIcon = btn.querySelector('.copy-icon');
+                    const copiedIcon = btn.querySelector('.copied-icon');
+
+                    copyIcon.style.display = 'none';
+                    copiedIcon.style.display = 'inline';
+                    btn.classList.add('copied');
+
+                    // Reset after 2 seconds
+                    setTimeout(() => {
+                        copyIcon.style.display = 'inline';
+                        copiedIcon.style.display = 'none';
+                        btn.classList.remove('copied');
+                    }, 2000);
+                } catch (err) {
+                    console.error('Failed to copy code:', err);
+                    // Fallback for older browsers
+                    fallbackCopyToClipboard(decodeURIComponent(atob(encodedContent)));
+                }
+            });
+        });
+    }
+
+    // Fallback copy method for browsers without clipboard API
+    function fallbackCopyToClipboard(text) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+        } catch (err) {
+            console.error('Fallback copy failed:', err);
+        }
+        document.body.removeChild(textarea);
     }
 
     // Render KaTeX math expressions
@@ -505,7 +564,19 @@
 
         // Wrap with line numbers
         const highlightedLines = highlightedCode.split('\n');
-        return `<table class="code-table"><tbody>${
+        const languageLabel = language ? escapeHtml(language) : '';
+
+        // Store the raw content for copy functionality using data attribute
+        const encodedContent = btoa(encodeURIComponent(content));
+
+        return `<div class="code-header">
+            <span class="code-language">${languageLabel}</span>
+            <button class="code-copy-btn" data-code="${encodedContent}" title="Copy code">
+                <span class="copy-icon">Copy</span>
+                <span class="copied-icon" style="display:none">Copied!</span>
+            </button>
+        </div>
+        <table class="code-table"><tbody>${
             highlightedLines.map((line, i) =>
                 `<tr class="code-line"><td class="line-number">${i + 1}</td><td class="line-content">${line || ' '}</td></tr>`
             ).join('')
