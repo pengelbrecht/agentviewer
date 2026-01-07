@@ -136,6 +136,12 @@ jobs:
           sha256sum agentviewer-* *.deb *.rpm 2>/dev/null > checksums.txt || sha256sum agentviewer-* > checksums.txt
           cat checksums.txt
 
+      - name: Save checksums for formula update
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: binaries/checksums.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -147,19 +153,14 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Save checksums for formula update
-        uses: actions/upload-artifact@v4
-        with:
-          name: checksums
-          path: binaries/checksums.txt
 
   update-homebrew:
     needs: release
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.ref_name, '-') }}  # Skip for prereleases
+    if: ${{ always() && needs.release.result != 'cancelled' && !contains(github.ref_name, '-') }}
 
     steps:
       - name: Checkout code
