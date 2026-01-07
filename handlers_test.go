@@ -948,7 +948,7 @@ func TestValidTabTypes(t *testing.T) {
 		tabType string
 		valid   bool
 	}{
-		{"", true},         // empty = auto-detect
+		{"", true}, // empty = auto-detect
 		{"markdown", true},
 		{"code", true},
 		{"diff", true},

@@ -604,7 +604,7 @@ func TestDetectLanguage_EdgeCases(t *testing.T) {
 		{"double dot", "..", ""},
 		{"hidden file without extension", ".hidden", ""},
 		{"hidden file with extension", ".hidden.go", "go"},
-		{"multiple extensions - last wins", "file.tar.gz", ""},           // .gz not recognized
+		{"multiple extensions - last wins", "file.tar.gz", ""},            // .gz not recognized
 		{"multiple extensions - known last", "file.min.js", "javascript"}, // .js is recognized
 		{"trailing dot", "file.", ""},
 		{"multiple trailing dots", "file...", ""},
@@ -1346,9 +1346,9 @@ func TestParseFilePath(t *testing.T) {
 
 func TestParseHunkHeader(t *testing.T) {
 	tests := []struct {
-		name                                       string
-		input                                      string
-		expectErr                                  bool
+		name                                   string
+		input                                  string
+		expectErr                              bool
 		oldStart, oldLines, newStart, newLines int
 	}{
 		{

@@ -142,13 +142,20 @@ func (s *Server) handleCreateTab(w http.ResponseWriter, r *http.Request) {
 		language = DetectLanguage(req.File, content)
 	}
 
+	// Determine source path for file-based tabs (enables auto-reload)
+	sourcePath := ""
+	if req.File != "" {
+		sourcePath = req.File
+	}
+
 	tab := &Tab{
-		ID:       req.ID,
-		Title:    req.Title,
-		Type:     tabType,
-		Content:  content,
-		Language: language,
-		DiffMeta: diffMeta,
+		ID:         req.ID,
+		Title:      req.Title,
+		Type:       tabType,
+		Content:    content,
+		Language:   language,
+		DiffMeta:   diffMeta,
+		SourcePath: sourcePath,
 	}
 
 	tab, created := s.state.CreateTab(tab)

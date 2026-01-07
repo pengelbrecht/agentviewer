@@ -101,10 +101,10 @@ func TestCLI_Help(t *testing.T) {
 	defer cleanup()
 
 	tests := []struct {
-		name       string
-		args       []string
-		wantInOut  []string
-		wantExit   int
+		name      string
+		args      []string
+		wantInOut []string
+		wantExit  int
 	}{
 		{
 			name: "no args shows help",
@@ -121,22 +121,22 @@ func TestCLI_Help(t *testing.T) {
 			wantExit: 0,
 		},
 		{
-			name:       "help flag",
-			args:       []string{"--help"},
-			wantInOut:  []string{"USAGE:", "agentviewer serve"},
-			wantExit:   0,
+			name:      "help flag",
+			args:      []string{"--help"},
+			wantInOut: []string{"USAGE:", "agentviewer serve"},
+			wantExit:  0,
 		},
 		{
-			name:       "short help flag",
-			args:       []string{"-h"},
-			wantInOut:  []string{"USAGE:", "agentviewer serve"},
-			wantExit:   0,
+			name:      "short help flag",
+			args:      []string{"-h"},
+			wantInOut: []string{"USAGE:", "agentviewer serve"},
+			wantExit:  0,
 		},
 		{
-			name:       "help command",
-			args:       []string{"help"},
-			wantInOut:  []string{"USAGE:", "agentviewer serve"},
-			wantExit:   0,
+			name:      "help command",
+			args:      []string{"help"},
+			wantInOut: []string{"USAGE:", "agentviewer serve"},
+			wantExit:  0,
 		},
 	}
 

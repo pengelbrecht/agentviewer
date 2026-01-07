@@ -67,11 +67,11 @@ func TestGetContentType(t *testing.T) {
 
 func TestServeStaticFile(t *testing.T) {
 	tests := []struct {
-		name           string
-		path           string
-		wantStatus     int
-		wantType       string
-		wantContains   string
+		name         string
+		path         string
+		wantStatus   int
+		wantType     string
+		wantContains string
 	}{
 		{
 			name:         "serve index.html at root",

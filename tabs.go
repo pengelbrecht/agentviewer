@@ -19,15 +19,16 @@ const (
 
 // Tab represents a single tab in the viewer.
 type Tab struct {
-	ID        string    `json:"id"`
-	Title     string    `json:"title"`
-	Type      TabType   `json:"type"`
-	Content   string    `json:"content"`
-	Language  string    `json:"language,omitempty"`
-	DiffMeta  *DiffMeta `json:"diff,omitempty"`
-	Active    bool      `json:"active,omitempty"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID         string    `json:"id"`
+	Title      string    `json:"title"`
+	Type       TabType   `json:"type"`
+	Content    string    `json:"content"`
+	Language   string    `json:"language,omitempty"`
+	DiffMeta   *DiffMeta `json:"diff,omitempty"`
+	SourcePath string    `json:"sourcePath,omitempty"` // File path for auto-reload; only set when created from file
+	Active     bool      `json:"active,omitempty"`
+	CreatedAt  time.Time `json:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt"`
 }
 
 // DiffMeta holds metadata for diff tabs.
@@ -84,6 +85,10 @@ func (s *State) CreateTab(tab *Tab) (*Tab, bool) {
 		existing.Content = tab.Content
 		existing.Language = tab.Language
 		existing.DiffMeta = tab.DiffMeta
+		// Only update SourcePath if provided (don't overwrite with empty)
+		if tab.SourcePath != "" {
+			existing.SourcePath = tab.SourcePath
+		}
 		existing.UpdatedAt = now
 		return existing, false
 	}

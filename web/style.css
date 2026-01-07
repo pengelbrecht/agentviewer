@@ -589,7 +589,7 @@ html, body {
 .content-code .code-table {
     width: 100%;
     border-collapse: collapse;
-    table-layout: fixed;
+    table-layout: auto;
     padding: 0.5em 0;
 }
 
@@ -602,9 +602,9 @@ html, body {
 }
 
 .content-code .code-table .line-number {
-    width: 3em;
-    min-width: 3em;
-    padding: 0 1em 0 0;
+    width: 4em;
+    max-width: 4em;
+    padding: 0 0.75em 0 0.5em;
     text-align: right;
     color: var(--text-muted);
     user-select: none;
@@ -613,6 +613,7 @@ html, body {
 }
 
 .content-code .code-table .line-content {
+    width: 100%;
     padding-left: 1em;
     white-space: pre;
     overflow-x: auto;
