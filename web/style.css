@@ -22,8 +22,15 @@
     /* Diff colors */
     --diff-add-bg: rgba(46, 160, 67, 0.15);
     --diff-add-border: rgba(46, 160, 67, 0.4);
+    --diff-add-text: #3fb950;
+    --diff-add-word-bg: rgba(46, 160, 67, 0.4);
     --diff-del-bg: rgba(248, 81, 73, 0.15);
     --diff-del-border: rgba(248, 81, 73, 0.4);
+    --diff-del-text: #f85149;
+    --diff-del-word-bg: rgba(248, 81, 73, 0.4);
+    --diff-gutter-bg: #161b22;
+    --diff-gutter-add-bg: rgba(46, 160, 67, 0.3);
+    --diff-gutter-del-bg: rgba(248, 81, 73, 0.3);
 
     /* Spacing */
     --content-padding: 24px;
@@ -58,10 +65,17 @@
         --inline-code-bg: #f0f0f0;
 
         /* Diff colors - light mode */
-        --diff-add-bg: rgba(46, 160, 67, 0.1);
-        --diff-add-border: rgba(46, 160, 67, 0.3);
-        --diff-del-bg: rgba(248, 81, 73, 0.1);
-        --diff-del-border: rgba(248, 81, 73, 0.3);
+        --diff-add-bg: rgba(46, 160, 67, 0.12);
+        --diff-add-border: rgba(46, 160, 67, 0.35);
+        --diff-add-text: #1a7f37;
+        --diff-add-word-bg: rgba(46, 160, 67, 0.35);
+        --diff-del-bg: rgba(248, 81, 73, 0.12);
+        --diff-del-border: rgba(248, 81, 73, 0.35);
+        --diff-del-text: #cf222e;
+        --diff-del-word-bg: rgba(248, 81, 73, 0.35);
+        --diff-gutter-bg: #f6f8fa;
+        --diff-gutter-add-bg: rgba(46, 160, 67, 0.25);
+        --diff-gutter-del-bg: rgba(248, 81, 73, 0.25);
     }
 }
 
@@ -83,8 +97,15 @@
     --inline-code-bg: #2d2d2d;
     --diff-add-bg: rgba(46, 160, 67, 0.15);
     --diff-add-border: rgba(46, 160, 67, 0.4);
+    --diff-add-text: #3fb950;
+    --diff-add-word-bg: rgba(46, 160, 67, 0.4);
     --diff-del-bg: rgba(248, 81, 73, 0.15);
     --diff-del-border: rgba(248, 81, 73, 0.4);
+    --diff-del-text: #f85149;
+    --diff-del-word-bg: rgba(248, 81, 73, 0.4);
+    --diff-gutter-bg: #161b22;
+    --diff-gutter-add-bg: rgba(46, 160, 67, 0.3);
+    --diff-gutter-del-bg: rgba(248, 81, 73, 0.3);
 }
 
 [data-theme="light"] {
@@ -102,10 +123,17 @@
     --code-bg: #f5f5f5;
     --code-border: #ddd;
     --inline-code-bg: #f0f0f0;
-    --diff-add-bg: rgba(46, 160, 67, 0.1);
-    --diff-add-border: rgba(46, 160, 67, 0.3);
-    --diff-del-bg: rgba(248, 81, 73, 0.1);
-    --diff-del-border: rgba(248, 81, 73, 0.3);
+    --diff-add-bg: rgba(46, 160, 67, 0.12);
+    --diff-add-border: rgba(46, 160, 67, 0.35);
+    --diff-add-text: #1a7f37;
+    --diff-add-word-bg: rgba(46, 160, 67, 0.35);
+    --diff-del-bg: rgba(248, 81, 73, 0.12);
+    --diff-del-border: rgba(248, 81, 73, 0.35);
+    --diff-del-text: #cf222e;
+    --diff-del-word-bg: rgba(248, 81, 73, 0.35);
+    --diff-gutter-bg: #f6f8fa;
+    --diff-gutter-add-bg: rgba(46, 160, 67, 0.25);
+    --diff-gutter-del-bg: rgba(248, 81, 73, 0.25);
 }
 
 * {
@@ -635,7 +663,7 @@ html, body {
 
 /* Side-by-side specific styles */
 .d2h-code-side-linenumber {
-    background: var(--bg-secondary) !important;
+    background: var(--diff-gutter-bg) !important;
     color: var(--text-muted) !important;
     border-right: 1px solid var(--border) !important;
     padding: 0 8px !important;
@@ -663,8 +691,13 @@ html, body {
 }
 
 .d2h-ins .d2h-code-side-linenumber {
-    background: rgba(46, 160, 67, 0.25) !important;
+    background: var(--diff-gutter-add-bg) !important;
     border-right-color: var(--diff-add-border) !important;
+    color: var(--diff-add-text) !important;
+}
+
+.d2h-ins .d2h-code-side-line {
+    border-left: 3px solid var(--diff-add-border);
 }
 
 .d2h-del {
@@ -672,21 +705,46 @@ html, body {
 }
 
 .d2h-del .d2h-code-side-linenumber {
-    background: rgba(248, 81, 73, 0.25) !important;
+    background: var(--diff-gutter-del-bg) !important;
     border-right-color: var(--diff-del-border) !important;
+    color: var(--diff-del-text) !important;
 }
 
-/* Inline highlighting for changed parts */
+.d2h-del .d2h-code-side-line {
+    border-left: 3px solid var(--diff-del-border);
+}
+
+/* Inline highlighting for changed parts (word-level diffs) */
 .d2h-ins ins,
 .d2h-code-side-line ins {
-    background: rgba(46, 160, 67, 0.35) !important;
+    background: var(--diff-add-word-bg) !important;
     text-decoration: none;
+    border-radius: 2px;
+    padding: 1px 0;
 }
 
 .d2h-del del,
 .d2h-code-side-line del {
-    background: rgba(248, 81, 73, 0.35) !important;
+    background: var(--diff-del-word-bg) !important;
     text-decoration: none;
+    border-radius: 2px;
+    padding: 1px 0;
+}
+
+/* Plus/minus prefix styling */
+.d2h-code-line-prefix {
+    user-select: none;
+    color: var(--text-muted);
+}
+
+.d2h-ins .d2h-code-line-prefix {
+    color: var(--diff-add-text) !important;
+    font-weight: 600;
+}
+
+.d2h-del .d2h-code-line-prefix {
+    color: var(--diff-del-text) !important;
+    font-weight: 600;
 }
 
 /* Hunk headers */
@@ -702,6 +760,15 @@ html, body {
 .d2h-emptyplaceholder,
 .d2h-code-side-emptyplaceholder {
     background: var(--bg-tertiary) !important;
+}
+
+/* Context (unchanged) lines */
+.d2h-cntx {
+    background: var(--bg-primary) !important;
+}
+
+.d2h-cntx .d2h-code-side-linenumber {
+    background: var(--diff-gutter-bg) !important;
 }
 
 /* ========== Fallback diff styles ========== */
@@ -728,6 +795,11 @@ html, body {
 
 .diff-header-left {
     border-right: 1px solid var(--border);
+    color: var(--diff-del-text);
+}
+
+.diff-header-right {
+    color: var(--diff-add-text);
 }
 
 .diff-table {
@@ -749,7 +821,7 @@ html, body {
     min-width: 40px;
     text-align: right;
     color: var(--text-muted);
-    background: var(--bg-secondary);
+    background: var(--diff-gutter-bg);
     user-select: none;
     border-right: 1px solid var(--border);
     padding-right: 8px !important;
@@ -768,20 +840,26 @@ html, body {
 
 .diff-line.diff-add {
     background: var(--diff-add-bg);
+    border-left: 3px solid var(--diff-add-border);
 }
 
 .diff-line.diff-add.diff-line-num {
-    background: rgba(46, 160, 67, 0.25);
+    background: var(--diff-gutter-add-bg);
     border-right-color: var(--diff-add-border);
+    color: var(--diff-add-text);
+    border-left: none;
 }
 
 .diff-line.diff-delete {
     background: var(--diff-del-bg);
+    border-left: 3px solid var(--diff-del-border);
 }
 
 .diff-line.diff-delete.diff-line-num {
-    background: rgba(248, 81, 73, 0.25);
+    background: var(--diff-gutter-del-bg);
     border-right-color: var(--diff-del-border);
+    color: var(--diff-del-text);
+    border-left: none;
 }
 
 .diff-line.diff-context {
@@ -910,11 +988,13 @@ html, body {
 .diff-fallback .diff-add {
     background: var(--diff-add-bg);
     border-left: 3px solid var(--diff-add-border);
+    color: var(--diff-add-text);
 }
 
 .diff-fallback .diff-remove {
     background: var(--diff-del-bg);
     border-left: 3px solid var(--diff-del-border);
+    color: var(--diff-del-text);
 }
 
 .diff-fallback .diff-hunk {
@@ -923,6 +1003,21 @@ html, body {
     margin-top: 8px;
     padding: 4px 8px;
     border-radius: 3px;
+}
+
+/* Inline word-level highlighting for fallback */
+.diff-fallback ins {
+    background: var(--diff-add-word-bg);
+    text-decoration: none;
+    border-radius: 2px;
+    padding: 1px 2px;
+}
+
+.diff-fallback del {
+    background: var(--diff-del-word-bg);
+    text-decoration: none;
+    border-radius: 2px;
+    padding: 1px 2px;
 }
 
 /* Mermaid diagram styling */
