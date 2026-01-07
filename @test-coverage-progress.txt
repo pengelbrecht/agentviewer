@@ -1,0 +1,5 @@
+# Test Coverage Progress
+# Format: iteration | what was tested | coverage % | learnings
+
+1 | ParseDiffMode and buildGitDiffArgs (git diff mode parsing) | 75.9% | Added gitdiff_test.go testing all diff modes (commit, range, staged, head, unstaged) and error cases. Coverage up from 74.2%.
+2 | Live file watching (UpdateTabContent, MarkTabStale, ClearTabStale) | 78.9% | These power file watcher UX: auto-updating content and stale indicators when files change/delete. All 3 funcs now 100% covered.
