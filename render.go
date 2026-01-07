@@ -3,38 +3,172 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
+// FileAccessConfig holds security configuration for file access.
+type FileAccessConfig struct {
+	// AllowedDirs is a list of directories that files can be read from.
+	// If empty, all directories are allowed (default).
+	// Paths must be absolute.
+	AllowedDirs []string
+
+	// LogAccess enables logging of file access attempts.
+	LogAccess bool
+
+	// Logger is the logger to use for file access logging.
+	// If nil, uses the default log package.
+	Logger *log.Logger
+}
+
+// fileAccessConfig is the global file access configuration.
+var fileAccessConfig = &FileAccessConfig{
+	AllowedDirs: nil,    // Allow all directories by default
+	LogAccess:   false,  // Logging disabled by default
+	Logger:      nil,
+}
+
+var fileAccessConfigMu sync.RWMutex
+
+// SetFileAccessConfig sets the global file access configuration.
+func SetFileAccessConfig(config *FileAccessConfig) {
+	fileAccessConfigMu.Lock()
+	defer fileAccessConfigMu.Unlock()
+	fileAccessConfig = config
+}
+
+// GetFileAccessConfig returns a copy of the current file access configuration.
+func GetFileAccessConfig() *FileAccessConfig {
+	fileAccessConfigMu.RLock()
+	defer fileAccessConfigMu.RUnlock()
+	return &FileAccessConfig{
+		AllowedDirs: append([]string{}, fileAccessConfig.AllowedDirs...),
+		LogAccess:   fileAccessConfig.LogAccess,
+		Logger:      fileAccessConfig.Logger,
+	}
+}
+
+// logFileAccess logs a file access attempt if logging is enabled.
+func logFileAccess(path string, allowed bool, reason string) {
+	fileAccessConfigMu.RLock()
+	config := fileAccessConfig
+	fileAccessConfigMu.RUnlock()
+
+	if !config.LogAccess {
+		return
+	}
+
+	status := "ALLOWED"
+	if !allowed {
+		status = "DENIED"
+	}
+
+	msg := fmt.Sprintf("[FILE ACCESS] %s: %s", status, path)
+	if reason != "" {
+		msg += fmt.Sprintf(" (%s)", reason)
+	}
+
+	if config.Logger != nil {
+		config.Logger.Println(msg)
+	} else {
+		log.Println(msg)
+	}
+}
+
+// ValidatePath checks if a path is valid and secure.
+// Returns the cleaned absolute path and any error.
+func ValidatePath(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("path cannot be empty")
+	}
+
+	// Clean the path first
+	cleanPath := filepath.Clean(path)
+
+	// Convert to absolute path
+	absPath, err := filepath.Abs(cleanPath)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve path: %w", err)
+	}
+
+	// Check against allowed directories if configured
+	fileAccessConfigMu.RLock()
+	allowedDirs := fileAccessConfig.AllowedDirs
+	fileAccessConfigMu.RUnlock()
+
+	if len(allowedDirs) > 0 {
+		allowed := false
+		for _, dir := range allowedDirs {
+			// Clean and absolutize the allowed directory
+			cleanDir, err := filepath.Abs(filepath.Clean(dir))
+			if err != nil {
+				continue
+			}
+			// Check if the file path is within the allowed directory
+			if isSubPath(cleanDir, absPath) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			logFileAccess(absPath, false, "path not in allowed directories")
+			return "", fmt.Errorf("access denied: path not in allowed directories: %s", absPath)
+		}
+	}
+
+	return absPath, nil
+}
+
+// isSubPath checks if filePath is within or equal to dirPath.
+func isSubPath(dirPath, filePath string) bool {
+	// Ensure dirPath ends with separator for proper prefix check
+	if !strings.HasSuffix(dirPath, string(filepath.Separator)) {
+		dirPath += string(filepath.Separator)
+	}
+	return strings.HasPrefix(filePath+string(filepath.Separator), dirPath) ||
+		strings.TrimSuffix(filePath, string(filepath.Separator)) == strings.TrimSuffix(dirPath, string(filepath.Separator))
+}
+
 // ReadFileContent reads a file and returns its content.
 // It validates that the path exists, is a regular file (not a directory),
-// and is readable. Returns the content as a string.
+// and is readable. It also enforces security restrictions from FileAccessConfig.
+// Returns the content as a string.
 func ReadFileContent(path string) (string, error) {
-	// Clean the path to normalize it
-	cleanPath := filepath.Clean(path)
+	// Validate and clean the path (includes security checks)
+	cleanPath, err := ValidatePath(path)
+	if err != nil {
+		return "", err
+	}
 
 	// Get file info to validate the path
 	info, err := os.Stat(cleanPath)
 	if err != nil {
 		if os.IsNotExist(err) {
+			logFileAccess(cleanPath, false, "file not found")
 			return "", fmt.Errorf("file not found: %s", cleanPath)
 		}
 		if os.IsPermission(err) {
+			logFileAccess(cleanPath, false, "permission denied")
 			return "", fmt.Errorf("permission denied: %s", cleanPath)
 		}
+		logFileAccess(cleanPath, false, "cannot access")
 		return "", fmt.Errorf("cannot access file: %w", err)
 	}
 
 	// Ensure it's a regular file, not a directory or other type
 	if info.IsDir() {
+		logFileAccess(cleanPath, false, "is a directory")
 		return "", fmt.Errorf("path is a directory, not a file: %s", cleanPath)
 	}
 	if !info.Mode().IsRegular() {
+		logFileAccess(cleanPath, false, "not a regular file")
 		return "", fmt.Errorf("path is not a regular file: %s", cleanPath)
 	}
 
@@ -42,10 +176,15 @@ func ReadFileContent(path string) (string, error) {
 	data, err := os.ReadFile(cleanPath)
 	if err != nil {
 		if os.IsPermission(err) {
+			logFileAccess(cleanPath, false, "permission denied reading")
 			return "", fmt.Errorf("permission denied reading file: %s", cleanPath)
 		}
+		logFileAccess(cleanPath, false, "read failed")
 		return "", fmt.Errorf("failed to read file: %w", err)
 	}
+
+	// Log successful access
+	logFileAccess(cleanPath, true, "")
 
 	return string(data), nil
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -975,4 +976,332 @@ func containsHelper(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestValidatePath(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a test file
+	testFile := filepath.Join(tmpDir, "test.txt")
+	os.WriteFile(testFile, []byte("test"), 0644)
+
+	// Create a subdirectory with a file
+	subDir := filepath.Join(tmpDir, "subdir")
+	os.MkdirAll(subDir, 0755)
+	subFile := filepath.Join(subDir, "file.txt")
+	os.WriteFile(subFile, []byte("sub"), 0644)
+
+	// Save original config and restore after test
+	originalConfig := GetFileAccessConfig()
+	defer SetFileAccessConfig(originalConfig)
+
+	tests := []struct {
+		name        string
+		path        string
+		allowedDirs []string
+		expectErr   bool
+		errContains string
+	}{
+		{
+			name:        "valid absolute path",
+			path:        testFile,
+			allowedDirs: nil,
+			expectErr:   false,
+		},
+		{
+			name:        "empty path",
+			path:        "",
+			allowedDirs: nil,
+			expectErr:   true,
+			errContains: "cannot be empty",
+		},
+		{
+			name:        "allowed directory - file inside",
+			path:        testFile,
+			allowedDirs: []string{tmpDir},
+			expectErr:   false,
+		},
+		{
+			name:        "allowed directory - file outside",
+			path:        "/etc/passwd",
+			allowedDirs: []string{tmpDir},
+			expectErr:   true,
+			errContains: "not in allowed directories",
+		},
+		{
+			name:        "multiple allowed directories - first match",
+			path:        testFile,
+			allowedDirs: []string{tmpDir, "/opt"},
+			expectErr:   false,
+		},
+		{
+			name:        "multiple allowed directories - second match",
+			path:        testFile,
+			allowedDirs: []string{"/opt", tmpDir},
+			expectErr:   false,
+		},
+		{
+			name:        "path traversal blocked by allowed dirs",
+			path:        filepath.Join(subDir, "..", "..", "etc", "passwd"),
+			allowedDirs: []string{tmpDir},
+			expectErr:   true,
+			errContains: "not in allowed directories",
+		},
+		{
+			name:        "relative path within allowed dir normalized correctly",
+			path:        filepath.Join(subDir, "..", "test.txt"),
+			allowedDirs: []string{tmpDir},
+			expectErr:   false, // This resolves to testFile which is in allowed dir
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			SetFileAccessConfig(&FileAccessConfig{
+				AllowedDirs: tt.allowedDirs,
+				LogAccess:   false,
+			})
+
+			result, err := ValidatePath(tt.path)
+
+			if tt.expectErr {
+				if err == nil {
+					t.Errorf("Expected error, got nil")
+				} else if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("Expected error containing %q, got %q", tt.errContains, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if result == "" {
+					t.Error("Expected non-empty result path")
+				}
+			}
+		})
+	}
+}
+
+func TestIsSubPath(t *testing.T) {
+	tests := []struct {
+		dirPath  string
+		filePath string
+		expected bool
+	}{
+		{"/home/user", "/home/user/file.txt", true},
+		{"/home/user", "/home/user/subdir/file.txt", true},
+		{"/home/user", "/home/user", true},
+		{"/home/user/", "/home/user", true},
+		{"/home/user", "/home/user/", true},
+		{"/home/user", "/home/userX/file.txt", false},
+		{"/home/user", "/home/other/file.txt", false},
+		{"/home/user", "/etc/passwd", false},
+		{"/home/user/dir", "/home/user", false},
+	}
+
+	for _, tt := range tests {
+		name := tt.dirPath + " contains " + tt.filePath
+		t.Run(name, func(t *testing.T) {
+			result := isSubPath(tt.dirPath, tt.filePath)
+			if result != tt.expected {
+				t.Errorf("isSubPath(%q, %q) = %v, want %v",
+					tt.dirPath, tt.filePath, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestFileAccessConfig(t *testing.T) {
+	// Save original config
+	originalConfig := GetFileAccessConfig()
+	defer SetFileAccessConfig(originalConfig)
+
+	t.Run("set and get config", func(t *testing.T) {
+		newConfig := &FileAccessConfig{
+			AllowedDirs: []string{"/tmp", "/home"},
+			LogAccess:   true,
+		}
+		SetFileAccessConfig(newConfig)
+
+		got := GetFileAccessConfig()
+		if len(got.AllowedDirs) != 2 {
+			t.Errorf("Expected 2 allowed dirs, got %d", len(got.AllowedDirs))
+		}
+		if !got.LogAccess {
+			t.Error("Expected LogAccess to be true")
+		}
+	})
+
+	t.Run("config copy is independent", func(t *testing.T) {
+		SetFileAccessConfig(&FileAccessConfig{
+			AllowedDirs: []string{"/original"},
+			LogAccess:   true,
+		})
+
+		got := GetFileAccessConfig()
+		got.AllowedDirs = append(got.AllowedDirs, "/modified")
+		got.LogAccess = false
+
+		// Original should be unchanged
+		current := GetFileAccessConfig()
+		if len(current.AllowedDirs) != 1 {
+			t.Errorf("Original config was modified, expected 1 dir, got %d", len(current.AllowedDirs))
+		}
+		if !current.LogAccess {
+			t.Error("Original config LogAccess was modified")
+		}
+	})
+}
+
+func TestReadFileContentWithSecurityConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create test files
+	allowedFile := filepath.Join(tmpDir, "allowed", "file.txt")
+	os.MkdirAll(filepath.Dir(allowedFile), 0755)
+	os.WriteFile(allowedFile, []byte("allowed content"), 0644)
+
+	restrictedFile := filepath.Join(tmpDir, "restricted", "file.txt")
+	os.MkdirAll(filepath.Dir(restrictedFile), 0755)
+	os.WriteFile(restrictedFile, []byte("restricted content"), 0644)
+
+	// Save original config
+	originalConfig := GetFileAccessConfig()
+	defer SetFileAccessConfig(originalConfig)
+
+	t.Run("access allowed file", func(t *testing.T) {
+		SetFileAccessConfig(&FileAccessConfig{
+			AllowedDirs: []string{filepath.Join(tmpDir, "allowed")},
+			LogAccess:   false,
+		})
+
+		content, err := ReadFileContent(allowedFile)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if content != "allowed content" {
+			t.Errorf("Expected 'allowed content', got %q", content)
+		}
+	})
+
+	t.Run("access restricted file", func(t *testing.T) {
+		SetFileAccessConfig(&FileAccessConfig{
+			AllowedDirs: []string{filepath.Join(tmpDir, "allowed")},
+			LogAccess:   false,
+		})
+
+		_, err := ReadFileContent(restrictedFile)
+		if err == nil {
+			t.Error("Expected error for restricted file")
+		}
+		if !strings.Contains(err.Error(), "not in allowed directories") {
+			t.Errorf("Expected 'not in allowed directories' error, got: %v", err)
+		}
+	})
+
+	t.Run("path traversal blocked by allowed dirs", func(t *testing.T) {
+		SetFileAccessConfig(&FileAccessConfig{
+			AllowedDirs: []string{filepath.Join(tmpDir, "allowed")},
+			LogAccess:   false,
+		})
+
+		// Try to access with path traversal that escapes allowed dir
+		traversalPath := filepath.Join(tmpDir, "allowed", "..", "restricted", "file.txt")
+		_, err := ReadFileContent(traversalPath)
+		if err == nil {
+			t.Error("Expected error for path traversal")
+		}
+		if !strings.Contains(err.Error(), "not in allowed directories") {
+			t.Errorf("Expected 'not in allowed directories' error, got: %v", err)
+		}
+	})
+
+	t.Run("no restrictions allows all", func(t *testing.T) {
+		SetFileAccessConfig(&FileAccessConfig{
+			AllowedDirs: nil,
+			LogAccess:   false,
+		})
+
+		// Both files should be accessible
+		_, err1 := ReadFileContent(allowedFile)
+		_, err2 := ReadFileContent(restrictedFile)
+
+		if err1 != nil {
+			t.Errorf("Unexpected error for allowed file: %v", err1)
+		}
+		if err2 != nil {
+			t.Errorf("Unexpected error for restricted file: %v", err2)
+		}
+	})
+}
+
+func TestFileAccessLogging(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a test file
+	testFile := filepath.Join(tmpDir, "test.txt")
+	os.WriteFile(testFile, []byte("test content"), 0644)
+
+	// Save original config
+	originalConfig := GetFileAccessConfig()
+	defer SetFileAccessConfig(originalConfig)
+
+	t.Run("logging enabled captures access", func(t *testing.T) {
+		var logBuffer strings.Builder
+		logger := log.New(&logBuffer, "", 0)
+
+		SetFileAccessConfig(&FileAccessConfig{
+			AllowedDirs: nil,
+			LogAccess:   true,
+			Logger:      logger,
+		})
+
+		_, err := ReadFileContent(testFile)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		logOutput := logBuffer.String()
+		if !strings.Contains(logOutput, "ALLOWED") {
+			t.Errorf("Expected log to contain 'ALLOWED', got: %s", logOutput)
+		}
+		if !strings.Contains(logOutput, testFile) {
+			t.Errorf("Expected log to contain file path, got: %s", logOutput)
+		}
+	})
+
+	t.Run("logging captures denied access", func(t *testing.T) {
+		var logBuffer strings.Builder
+		logger := log.New(&logBuffer, "", 0)
+
+		SetFileAccessConfig(&FileAccessConfig{
+			AllowedDirs: []string{"/nonexistent"},
+			LogAccess:   true,
+			Logger:      logger,
+		})
+
+		_, _ = ReadFileContent(testFile)
+
+		logOutput := logBuffer.String()
+		if !strings.Contains(logOutput, "DENIED") {
+			t.Errorf("Expected log to contain 'DENIED', got: %s", logOutput)
+		}
+	})
+
+	t.Run("logging disabled produces no output", func(t *testing.T) {
+		var logBuffer strings.Builder
+		logger := log.New(&logBuffer, "", 0)
+
+		SetFileAccessConfig(&FileAccessConfig{
+			AllowedDirs: nil,
+			LogAccess:   false,
+			Logger:      logger,
+		})
+
+		_, _ = ReadFileContent(testFile)
+
+		if logBuffer.Len() > 0 {
+			t.Errorf("Expected no log output when logging disabled, got: %s", logBuffer.String())
+		}
+	})
 }
