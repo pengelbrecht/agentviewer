@@ -667,6 +667,236 @@ Regular text to end.
 	}
 }
 
+// TestBrowserMarkdownTaskLists verifies GFM task list styling.
+func TestBrowserMarkdownTaskLists(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	taskListContent := `# Task List Test
+
+## Shopping List
+- [x] Buy groceries
+- [ ] Pick up dry cleaning
+- [x] Call the plumber
+
+## Project Tasks
+- [ ] Design the architecture
+  - [x] Draw diagrams
+  - [ ] Write documentation
+- [x] Implement core features
+- [ ] Write tests
+`
+
+	createTestTab(t, baseURL, "Task Lists", "markdown", taskListContent)
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var checkboxCount int
+	var checkedCount int
+	var hasTaskListClass bool
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible(`.content-markdown`, chromedp.ByQuery),
+		chromedp.Sleep(500*time.Millisecond),
+		// Count all checkboxes
+		chromedp.Evaluate(`document.querySelectorAll('input[type="checkbox"]').length`, &checkboxCount),
+		// Count checked checkboxes
+		chromedp.Evaluate(`document.querySelectorAll('input[type="checkbox"]:checked').length`, &checkedCount),
+		// Check for task list styling class
+		chromedp.Evaluate(`document.querySelector('.contains-task-list') !== null || document.querySelector('.task-list-item') !== null || document.querySelector('li input[type="checkbox"]') !== null`, &hasTaskListClass),
+	)
+
+	if err != nil {
+		t.Fatalf("chromedp failed: %v", err)
+	}
+
+	if checkboxCount < 7 {
+		t.Errorf("expected at least 7 checkboxes, got %d", checkboxCount)
+	}
+
+	if checkedCount < 4 {
+		t.Errorf("expected at least 4 checked checkboxes, got %d", checkedCount)
+	}
+
+	if !hasTaskListClass {
+		t.Error("task list styling elements not found")
+	}
+
+	t.Logf("Task lists: %d checkboxes, %d checked", checkboxCount, checkedCount)
+}
+
+// TestBrowserMarkdownTables verifies table styling with striped rows.
+func TestBrowserMarkdownTables(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	tableContent := `# Table Test
+
+| Name | Age | City |
+|------|-----|------|
+| Alice | 28 | New York |
+| Bob | 35 | London |
+| Carol | 42 | Paris |
+| Dave | 31 | Tokyo |
+| Eve | 26 | Sydney |
+
+Another table with alignment:
+
+| Left | Center | Right |
+|:-----|:------:|------:|
+| L1   | C1     | R1    |
+| L2   | C2     | R2    |
+`
+
+	createTestTab(t, baseURL, "Tables", "markdown", tableContent)
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var tableCount int
+	var hasTableHeaders bool
+	var rowCount int
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible(`.content-markdown`, chromedp.ByQuery),
+		chromedp.Sleep(500*time.Millisecond),
+		// Count tables
+		chromedp.Evaluate(`document.querySelectorAll('.content-markdown table').length`, &tableCount),
+		// Check for table headers
+		chromedp.Evaluate(`document.querySelector('.content-markdown th') !== null`, &hasTableHeaders),
+		// Count rows
+		chromedp.Evaluate(`document.querySelectorAll('.content-markdown tr').length`, &rowCount),
+	)
+
+	if err != nil {
+		t.Fatalf("chromedp failed: %v", err)
+	}
+
+	if tableCount != 2 {
+		t.Errorf("expected 2 tables, got %d", tableCount)
+	}
+
+	if !hasTableHeaders {
+		t.Error("table headers not found")
+	}
+
+	// 2 header rows + 5 + 2 data rows = 9 total rows
+	if rowCount < 8 {
+		t.Errorf("expected at least 8 table rows, got %d", rowCount)
+	}
+
+	t.Logf("Tables: %d tables, %d rows", tableCount, rowCount)
+}
+
+// TestBrowserMarkdownBlockquotes verifies blockquote and nested blockquote styling.
+func TestBrowserMarkdownBlockquotes(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	blockquoteContent := `# Blockquote Test
+
+> This is a simple blockquote.
+> It can span multiple lines.
+
+> ## Blockquote with header
+>
+> This blockquote contains a header and multiple paragraphs.
+>
+> Second paragraph in the blockquote.
+
+> Level 1 quote
+>
+> > Level 2 nested quote
+> >
+> > > Level 3 deeply nested quote
+
+Normal text after blockquotes.
+`
+
+	createTestTab(t, baseURL, "Blockquotes", "markdown", blockquoteContent)
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var blockquoteCount int
+	var hasNestedBlockquote bool
+	var hasBlockquoteBorder bool
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible(`.content-markdown`, chromedp.ByQuery),
+		chromedp.Sleep(500*time.Millisecond),
+		// Count blockquotes
+		chromedp.Evaluate(`document.querySelectorAll('.content-markdown blockquote').length`, &blockquoteCount),
+		// Check for nested blockquotes
+		chromedp.Evaluate(`document.querySelector('.content-markdown blockquote blockquote') !== null`, &hasNestedBlockquote),
+		// Check for border-left styling (via computed style)
+		chromedp.Evaluate(`(() => {
+			const bq = document.querySelector('.content-markdown blockquote');
+			if (!bq) return false;
+			const style = window.getComputedStyle(bq);
+			return style.borderLeftWidth !== '0px' && style.borderLeftStyle !== 'none';
+		})()`, &hasBlockquoteBorder),
+	)
+
+	if err != nil {
+		t.Fatalf("chromedp failed: %v", err)
+	}
+
+	if blockquoteCount < 3 {
+		t.Errorf("expected at least 3 blockquotes, got %d", blockquoteCount)
+	}
+
+	if !hasNestedBlockquote {
+		t.Error("nested blockquote not found")
+	}
+
+	if !hasBlockquoteBorder {
+		t.Error("blockquote border-left styling not applied")
+	}
+
+	t.Logf("Blockquotes: %d found, nested: %v, styled: %v", blockquoteCount, hasNestedBlockquote, hasBlockquoteBorder)
+}
+
 // TestBrowserKatexErrorHandling verifies invalid math is handled gracefully.
 func TestBrowserKatexErrorHandling(t *testing.T) {
 	baseURL, cleanup := startTestServer(t)
