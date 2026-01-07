@@ -288,6 +288,182 @@ func TestCreateUnifiedDiff(t *testing.T) {
 	})
 }
 
+func TestComputeDiff(t *testing.T) {
+	t.Run("identical files", func(t *testing.T) {
+		content := "line1\nline2\nline3\n"
+		result := ComputeDiff("a.txt", "b.txt", content, content)
+
+		if len(result.Hunks) != 0 {
+			t.Errorf("Expected no hunks for identical content, got %d", len(result.Hunks))
+		}
+		if result.LeftPath != "a.txt" {
+			t.Errorf("Expected LeftPath 'a.txt', got %s", result.LeftPath)
+		}
+		if result.RightPath != "b.txt" {
+			t.Errorf("Expected RightPath 'b.txt', got %s", result.RightPath)
+		}
+	})
+
+	t.Run("single line change", func(t *testing.T) {
+		left := "line1\nline2\nline3\n"
+		right := "line1\nchanged\nline3\n"
+
+		result := ComputeDiff("old.txt", "new.txt", left, right)
+
+		if len(result.Hunks) != 1 {
+			t.Fatalf("Expected 1 hunk, got %d", len(result.Hunks))
+		}
+
+		hunk := result.Hunks[0]
+		// Should have context, delete, add, context
+		hasDelete := false
+		hasAdd := false
+		for _, line := range hunk.Lines {
+			if line.Type == "delete" && contains(line.Content, "line2") {
+				hasDelete = true
+			}
+			if line.Type == "add" && contains(line.Content, "changed") {
+				hasAdd = true
+			}
+		}
+		if !hasDelete {
+			t.Error("Expected hunk to contain deleted line 'line2'")
+		}
+		if !hasAdd {
+			t.Error("Expected hunk to contain added line 'changed'")
+		}
+	})
+
+	t.Run("addition at end", func(t *testing.T) {
+		left := "line1\nline2\n"
+		right := "line1\nline2\nline3\n"
+
+		result := ComputeDiff("old.txt", "new.txt", left, right)
+
+		if len(result.Hunks) != 1 {
+			t.Fatalf("Expected 1 hunk, got %d", len(result.Hunks))
+		}
+
+		hasAdd := false
+		for _, line := range result.Hunks[0].Lines {
+			if line.Type == "add" && contains(line.Content, "line3") {
+				hasAdd = true
+			}
+		}
+		if !hasAdd {
+			t.Error("Expected hunk to contain added line 'line3'")
+		}
+	})
+
+	t.Run("deletion at start", func(t *testing.T) {
+		left := "line0\nline1\nline2\n"
+		right := "line1\nline2\n"
+
+		result := ComputeDiff("old.txt", "new.txt", left, right)
+
+		if len(result.Hunks) != 1 {
+			t.Fatalf("Expected 1 hunk, got %d", len(result.Hunks))
+		}
+
+		hasDelete := false
+		for _, line := range result.Hunks[0].Lines {
+			if line.Type == "delete" && contains(line.Content, "line0") {
+				hasDelete = true
+			}
+		}
+		if !hasDelete {
+			t.Error("Expected hunk to contain deleted line 'line0'")
+		}
+	})
+
+	t.Run("multiple separated changes", func(t *testing.T) {
+		// Changes far apart should produce separate hunks
+		left := "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\nl\nm\nn\no\np\n"
+		right := "a\nB\nc\nd\ne\nf\ng\nh\ni\nj\nK\nl\nm\nn\no\np\n"
+
+		result := ComputeDiff("old.txt", "new.txt", left, right)
+
+		// Changes at lines 2 and 11 should produce 2 hunks (more than 3 context lines apart)
+		if len(result.Hunks) < 1 {
+			t.Errorf("Expected at least 1 hunk for separated changes, got %d", len(result.Hunks))
+		}
+	})
+
+	t.Run("line numbers are correct", func(t *testing.T) {
+		left := "a\nb\nc\nd\n"
+		right := "a\nX\nc\nd\n"
+
+		result := ComputeDiff("old.txt", "new.txt", left, right)
+
+		for _, hunk := range result.Hunks {
+			for _, line := range hunk.Lines {
+				switch line.Type {
+				case "delete":
+					if line.OldNum == 0 {
+						t.Error("Delete line should have OldNum set")
+					}
+				case "add":
+					if line.NewNum == 0 {
+						t.Error("Add line should have NewNum set")
+					}
+				case "context":
+					if line.OldNum == 0 || line.NewNum == 0 {
+						t.Error("Context line should have both OldNum and NewNum set")
+					}
+				}
+			}
+		}
+	})
+}
+
+func TestCompareFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	t.Run("compare two files", func(t *testing.T) {
+		// Create test files
+		leftPath := filepath.Join(tmpDir, "left.txt")
+		rightPath := filepath.Join(tmpDir, "right.txt")
+
+		os.WriteFile(leftPath, []byte("hello\nworld\n"), 0644)
+		os.WriteFile(rightPath, []byte("hello\nGo\n"), 0644)
+
+		result, err := CompareFiles(leftPath, rightPath)
+		if err != nil {
+			t.Fatalf("CompareFiles failed: %v", err)
+		}
+
+		if result.LeftPath != leftPath {
+			t.Errorf("Expected LeftPath %s, got %s", leftPath, result.LeftPath)
+		}
+		if result.RightPath != rightPath {
+			t.Errorf("Expected RightPath %s, got %s", rightPath, result.RightPath)
+		}
+		if len(result.Hunks) != 1 {
+			t.Errorf("Expected 1 hunk, got %d", len(result.Hunks))
+		}
+	})
+
+	t.Run("left file not found", func(t *testing.T) {
+		rightPath := filepath.Join(tmpDir, "right.txt")
+		os.WriteFile(rightPath, []byte("content"), 0644)
+
+		_, err := CompareFiles("/nonexistent", rightPath)
+		if err == nil {
+			t.Error("Expected error for non-existent left file")
+		}
+	})
+
+	t.Run("right file not found", func(t *testing.T) {
+		leftPath := filepath.Join(tmpDir, "left2.txt")
+		os.WriteFile(leftPath, []byte("content"), 0644)
+
+		_, err := CompareFiles(leftPath, "/nonexistent")
+		if err == nil {
+			t.Error("Expected error for non-existent right file")
+		}
+	})
+}
+
 // Helper to check if string contains substring
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
