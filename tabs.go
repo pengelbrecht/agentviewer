@@ -37,12 +37,16 @@ type DiffMeta struct {
 	Language   string `json:"language,omitempty"`
 }
 
+// maxClosedTabs is the maximum number of recently closed tabs to keep in memory.
+const maxClosedTabs = 10
+
 // State manages all tabs and their ordering.
 type State struct {
-	mu       sync.RWMutex
-	tabs     map[string]*Tab
-	order    []string
-	activeID string
+	mu         sync.RWMutex
+	tabs       map[string]*Tab
+	order      []string
+	activeID   string
+	closedTabs []*Tab // Recently closed tabs (stack, most recent last)
 }
 
 // NewState creates a new State instance.
@@ -113,13 +117,23 @@ func (s *State) GetTab(id string) (*Tab, bool) {
 	return nil, false
 }
 
-// DeleteTab removes a tab by ID.
+// DeleteTab removes a tab by ID, storing it for potential reopen.
 func (s *State) DeleteTab(id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, exists := s.tabs[id]; !exists {
+	tab, exists := s.tabs[id]
+	if !exists {
 		return false
+	}
+
+	// Store a copy of the tab for potential reopen
+	tabCopy := *tab
+	s.closedTabs = append(s.closedTabs, &tabCopy)
+
+	// Trim closed tabs if we exceed the limit
+	if len(s.closedTabs) > maxClosedTabs {
+		s.closedTabs = s.closedTabs[len(s.closedTabs)-maxClosedTabs:]
 	}
 
 	delete(s.tabs, id)
@@ -195,4 +209,46 @@ func (s *State) TabCount() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.tabs)
+}
+
+// ReopenTab restores the most recently closed tab.
+// Returns the reopened tab, or nil if no closed tabs are available.
+func (s *State) ReopenTab() *Tab {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(s.closedTabs) == 0 {
+		return nil
+	}
+
+	// Pop the most recently closed tab
+	tab := s.closedTabs[len(s.closedTabs)-1]
+	s.closedTabs = s.closedTabs[:len(s.closedTabs)-1]
+
+	// Check if a tab with this ID already exists (edge case)
+	if _, exists := s.tabs[tab.ID]; exists {
+		// Generate a new ID to avoid collision
+		tab.ID = GenerateID()
+	}
+
+	// Update timestamps
+	now := time.Now()
+	tab.UpdatedAt = now
+
+	// Re-add to state
+	s.tabs[tab.ID] = tab
+	s.order = append(s.order, tab.ID)
+	s.activeID = tab.ID
+
+	// Return a copy
+	tabCopy := *tab
+	tabCopy.Active = true
+	return &tabCopy
+}
+
+// ClosedTabCount returns the number of tabs available for reopen.
+func (s *State) ClosedTabCount() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.closedTabs)
 }
