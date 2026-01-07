@@ -66,6 +66,34 @@ EXAMPLES:
   # Show code file via API
   curl -X POST localhost:3333/api/tabs \
     -d '{"title": "main.go", "type": "code", "file": "/path/to/main.go"}'
+
+GIT DIFF EXAMPLES:
+  # Show unstaged changes to a file
+  curl -X POST localhost:3333/api/tabs \
+    -d '{"type": "diff", "path": "/path/to/file.go", "diffMode": "unstaged"}'
+
+  # Show staged changes (index vs HEAD)
+  curl -X POST localhost:3333/api/tabs \
+    -d '{"type": "diff", "path": "/path/to/file.py", "diffMode": "staged"}'
+
+  # Show all uncommitted changes (working dir vs HEAD)
+  curl -X POST localhost:3333/api/tabs \
+    -d '{"type": "diff", "path": "/path/to/main.go", "diffMode": "head"}'
+
+  # Show changes from a specific commit
+  curl -X POST localhost:3333/api/tabs \
+    -d '{"type": "diff", "path": "/path/to/file.go", "diffMode": "commit:abc123"}'
+
+  # Show changes between two refs
+  curl -X POST localhost:3333/api/tabs \
+    -d '{"type": "diff", "path": "/path/to/file.go", "diffMode": "range:main..feature"}'
+
+DIFF MODES:
+  unstaged    Working directory vs index (default)
+  staged      Index vs HEAD (what's staged for commit)
+  head        Working directory vs HEAD (all uncommitted changes)
+  commit:SHA  Changes introduced by a specific commit
+  range:A..B  Diff between two refs (branches, tags, commits)
 `
 
 func main() {

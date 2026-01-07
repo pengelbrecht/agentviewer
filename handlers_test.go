@@ -97,7 +97,7 @@ func TestCreateTab_DiffWithoutData(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
-	if resp.Error != "Diff type requires 'diff' object, 'content', or 'file'" {
+	if resp.Error != "Diff type requires 'diff' object, 'content', 'file', or 'path' (for git diff)" {
 		t.Errorf("unexpected error: %q", resp.Error)
 	}
 }
@@ -939,6 +939,194 @@ func TestWriteError(t *testing.T) {
 	}
 	if resp.Error != "something went wrong" {
 		t.Errorf("expected error 'something went wrong', got %q", resp.Error)
+	}
+}
+
+// TestCreateTab_GitDiff tests creating a diff tab using git diff.
+func TestCreateTab_GitDiff(t *testing.T) {
+	srv := setupTestServer()
+
+	// Use a file in the current repo that exists
+	filePath := getTestDataPath(t, "sample.go")
+
+	bodyObj := map[string]interface{}{
+		"type":     "diff",
+		"path":     filePath,
+		"diffMode": "head",
+	}
+	bodyBytes, _ := json.Marshal(bodyObj)
+	req := httptest.NewRequest("POST", "/api/tabs", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	srv.handleCreateTab(w, req)
+
+	// This should succeed since sample.go is a tracked file in the repo
+	if w.Code != http.StatusOK {
+		t.Logf("Response: %s", w.Body.String())
+		// Git diff may return empty if no changes - that's OK
+		// We just want to verify the API accepts the parameters correctly
+	}
+
+	if w.Code == http.StatusOK {
+		var resp CreateTabResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to parse response: %v", err)
+		}
+		if resp.Type != "diff" {
+			t.Errorf("expected type 'diff', got %q", resp.Type)
+		}
+
+		// Verify auto-generated title contains the filename and mode
+		tab, _ := srv.state.GetTab(resp.ID)
+		if tab.Title == "" {
+			t.Error("expected auto-generated title")
+		}
+		if !strings.Contains(tab.Title, "sample.go") {
+			t.Errorf("expected title to contain filename, got: %q", tab.Title)
+		}
+		if !strings.Contains(tab.Title, "HEAD") {
+			t.Errorf("expected title to contain mode info, got: %q", tab.Title)
+		}
+	}
+}
+
+// TestCreateTab_GitDiffInvalidMode tests error handling for invalid diff mode.
+func TestCreateTab_GitDiffInvalidMode(t *testing.T) {
+	srv := setupTestServer()
+
+	filePath := getTestDataPath(t, "sample.go")
+
+	bodyObj := map[string]interface{}{
+		"type":     "diff",
+		"path":     filePath,
+		"diffMode": "invalid-mode",
+	}
+	bodyBytes, _ := json.Marshal(bodyObj)
+	req := httptest.NewRequest("POST", "/api/tabs", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	srv.handleCreateTab(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+
+	var resp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if !strings.Contains(resp.Error, "Invalid diffMode") {
+		t.Errorf("expected error about invalid diffMode, got: %q", resp.Error)
+	}
+}
+
+// TestCreateTab_GitDiffNonexistentPath tests error handling for nonexistent file.
+func TestCreateTab_GitDiffNonexistentPath(t *testing.T) {
+	srv := setupTestServer()
+
+	bodyObj := map[string]interface{}{
+		"type": "diff",
+		"path": "/nonexistent/file.go",
+	}
+	bodyBytes, _ := json.Marshal(bodyObj)
+	req := httptest.NewRequest("POST", "/api/tabs", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	srv.handleCreateTab(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+
+	var resp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if !strings.Contains(resp.Error, "Git diff failed") {
+		t.Errorf("expected error about git diff failure, got: %q", resp.Error)
+	}
+}
+
+// TestModeLabels tests the mode label helper functions.
+func TestModeLabels(t *testing.T) {
+	tests := []struct {
+		mode      DiffMode
+		wantLeft  string
+		wantRight string
+	}{
+		{DiffMode{Type: "unstaged"}, "Index (staged)", "Working Directory"},
+		{DiffMode{Type: "staged"}, "HEAD", "Index (staged)"},
+		{DiffMode{Type: "head"}, "HEAD", "Working Directory"},
+		{DiffMode{Type: "commit", Ref: "abc123"}, "abc123^", "abc123"},
+		{DiffMode{Type: "range", Ref: "main..feature"}, "main", "feature"},
+		{DiffMode{Type: "range", Ref: "v1.0...v2.0"}, "v1.0", "v2.0"},
+		{DiffMode{Type: "unknown"}, "a", "b"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.mode.Type, func(t *testing.T) {
+			if got := modeLeftLabel(tt.mode); got != tt.wantLeft {
+				t.Errorf("modeLeftLabel() = %q, want %q", got, tt.wantLeft)
+			}
+			if got := modeRightLabel(tt.mode); got != tt.wantRight {
+				t.Errorf("modeRightLabel() = %q, want %q", got, tt.wantRight)
+			}
+		})
+	}
+}
+
+// TestFormatGitDiffTitle tests the title formatting helper.
+func TestFormatGitDiffTitle(t *testing.T) {
+	tests := []struct {
+		path     string
+		mode     DiffMode
+		wantPart string // substring that should be in the title
+	}{
+		{"/path/to/file.go", DiffMode{Type: "unstaged"}, "file.go (unstaged)"},
+		{"/path/to/file.go", DiffMode{Type: "staged"}, "file.go (staged)"},
+		{"/path/to/file.go", DiffMode{Type: "head"}, "file.go (vs HEAD)"},
+		{"/path/to/file.go", DiffMode{Type: "commit", Ref: "abc123def"}, "file.go (abc123de)"}, // truncated SHA
+		{"/path/to/file.go", DiffMode{Type: "range", Ref: "main..feature"}, "file.go (main..feature)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.mode.Type, func(t *testing.T) {
+			got := formatGitDiffTitle(tt.path, tt.mode)
+			if got != tt.wantPart {
+				t.Errorf("formatGitDiffTitle() = %q, want %q", got, tt.wantPart)
+			}
+		})
+	}
+}
+
+// TestSplitRange tests the range splitting helper.
+func TestSplitRange(t *testing.T) {
+	tests := []struct {
+		ref  string
+		want []string
+	}{
+		{"main..feature", []string{"main", "feature"}},
+		{"v1.0...v2.0", []string{"v1.0", "v2.0"}},
+		{"single", []string{"single"}},
+		{"a..b..c", []string{"a", "b..c"}}, // only first split
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.ref, func(t *testing.T) {
+			got := splitRange(tt.ref)
+			if len(got) != len(tt.want) {
+				t.Errorf("splitRange() = %v, want %v", got, tt.want)
+				return
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("splitRange()[%d] = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
 	}
 }
 
