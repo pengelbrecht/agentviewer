@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-//go:embed web/*
+//go:embed web
 var webFS embed.FS
 
 // ServeStaticFile serves embedded static files.
