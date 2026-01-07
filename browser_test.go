@@ -576,13 +576,20 @@ func TestBrowser_DiffTabRendering(t *testing.T) {
 
 	var hasDiffContent bool
 	var hasDiffTable bool
+	var diffText string
+	var hasObjectObject bool
 
 	err := chromedp.Run(ctx,
 		chromedp.Navigate(baseURL),
 		chromedp.WaitVisible(".content-diff", chromedp.ByQuery),
+		chromedp.Sleep(500*time.Millisecond), // Wait for diff rendering
 		chromedp.Evaluate(`document.querySelector('.content-diff') !== null`, &hasDiffContent),
 		// Check for either diff2html table or fallback table
 		chromedp.Evaluate(`document.querySelector('.d2h-diff-table') !== null || document.querySelector('.diff-table') !== null`, &hasDiffTable),
+		// Get the text content to verify actual diff is rendered
+		chromedp.Evaluate(`document.querySelector('.content-diff').textContent`, &diffText),
+		// Check for [object Object] rendering bug
+		chromedp.Evaluate(`document.querySelector('.content-diff').textContent.includes('[object Object]')`, &hasObjectObject),
 	)
 
 	if err != nil {
@@ -595,6 +602,15 @@ func TestBrowser_DiffTabRendering(t *testing.T) {
 
 	if !hasDiffTable {
 		t.Error("expected diff table to exist")
+	}
+
+	if hasObjectObject {
+		t.Errorf("diff rendering bug: found '[object Object]' in content: %s", diffText[:min(200, len(diffText))])
+	}
+
+	// Verify actual diff content is visible (at least one of the diff lines)
+	if !strings.Contains(diffText, "old line") && !strings.Contains(diffText, "new line") {
+		t.Errorf("expected diff content to contain actual diff lines, got: %s", diffText[:min(200, len(diffText))])
 	}
 }
 
