@@ -31,6 +31,7 @@ OPTIONS:
   --open, -o            Open browser automatically on start
   --type, -t <TYPE>     Content type: markdown, code, diff (default: auto-detect)
   --title <TITLE>       Tab title (default: filename)
+  --version, -v         Show version information
   --help, -h            Show this help message
 
 CONTENT TYPES:
@@ -70,6 +71,11 @@ EXAMPLES:
 func main() {
 	if len(os.Args) < 2 || os.Args[1] == "-h" || os.Args[1] == "--help" || os.Args[1] == "help" {
 		fmt.Print(helpText)
+		os.Exit(0)
+	}
+
+	if os.Args[1] == "-v" || os.Args[1] == "--version" || os.Args[1] == "version" {
+		fmt.Printf("agentviewer version %s\n", Version)
 		os.Exit(0)
 	}
 
