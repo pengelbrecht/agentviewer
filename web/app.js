@@ -9,6 +9,8 @@
     let ws = null;
     let reconnectAttempts = 0;
     const maxReconnectDelay = 30000; // 30 seconds max
+    let closedTabsHistory = []; // Stack of closed tabs for reopen functionality
+    const maxClosedTabs = 10; // Maximum number of closed tabs to remember
 
     // DOM Elements
     const tabsContainer = document.getElementById('tabs-container');
@@ -170,6 +172,12 @@
                 break;
 
             case 'tab_deleted':
+                // Save closed tab to history for reopen (only if not already saved locally)
+                // This handles tabs deleted via external API calls
+                const deletedTab = tabs.find(t => t.id === msg.id);
+                if (deletedTab && !closedTabsHistory.some(t => t.id === deletedTab.id && Date.now() - t.closedAt < 1000)) {
+                    saveClosedTab(deletedTab);
+                }
                 tabs = tabs.filter(t => t.id !== msg.id);
                 if (activeTabId === msg.id) {
                     activeTabId = tabs.length > 0 ? tabs[0].id : null;
@@ -487,8 +495,69 @@
 
     // Close a tab
     function closeTab(id) {
+        // Find and save the tab before closing (local save in case WS message is slow)
+        const tabToClose = tabs.find(t => t.id === id);
+        if (tabToClose) {
+            saveClosedTab(tabToClose);
+        }
+
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'close_tab', id: id }));
+        }
+    }
+
+    // Save a closed tab to history for reopen functionality
+    function saveClosedTab(tab) {
+        // Create a copy of the tab to preserve its state
+        const tabCopy = {
+            id: tab.id,
+            title: tab.title,
+            type: tab.type,
+            content: tab.content,
+            language: tab.language,
+            closedAt: Date.now()
+        };
+
+        // Add to history, limit size
+        closedTabsHistory.push(tabCopy);
+        if (closedTabsHistory.length > maxClosedTabs) {
+            closedTabsHistory.shift(); // Remove oldest
+        }
+    }
+
+    // Reopen the most recently closed tab
+    async function reopenClosedTab() {
+        if (closedTabsHistory.length === 0) {
+            return; // No tabs to reopen
+        }
+
+        const tab = closedTabsHistory.pop();
+
+        // Send create request to server
+        try {
+            const response = await fetch('/api/tabs', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    id: tab.id + '-' + Date.now(), // New unique ID to avoid conflicts
+                    title: tab.title,
+                    type: tab.type,
+                    content: tab.content,
+                    language: tab.language
+                })
+            });
+
+            if (!response.ok) {
+                // Put the tab back if failed
+                closedTabsHistory.push(tab);
+                console.error('Failed to reopen tab:', response.statusText);
+            }
+        } catch (error) {
+            // Put the tab back if failed
+            closedTabsHistory.push(tab);
+            console.error('Failed to reopen tab:', error);
         }
     }
 
@@ -497,6 +566,13 @@
         document.addEventListener('keydown', (e) => {
             const isMod = e.metaKey || e.ctrlKey;
 
+            // Cmd/Ctrl + Shift + T to reopen closed tab
+            if (isMod && e.shiftKey && (e.key === 't' || e.key === 'T')) {
+                e.preventDefault();
+                reopenClosedTab();
+                return;
+            }
+
             // Cmd/Ctrl + 1-9 to switch tabs
             if (isMod && e.key >= '1' && e.key <= '9') {
                 e.preventDefault();
@@ -504,6 +580,7 @@
                 if (idx < tabs.length) {
                     activateTab(tabs[idx].id);
                 }
+                return;
             }
 
             // Cmd/Ctrl + W to close tab
@@ -512,6 +589,7 @@
                 if (activeTabId) {
                     closeTab(activeTabId);
                 }
+                return;
             }
         });
     }
