@@ -64,11 +64,31 @@ type ErrorResponse struct {
 // Version is the application version.
 var Version = "0.1.0"
 
+// ValidTabTypes is the set of valid tab types.
+var ValidTabTypes = map[string]bool{
+	"":         true, // empty means auto-detect
+	"markdown": true,
+	"code":     true,
+	"diff":     true,
+}
+
 // handleCreateTab handles POST /api/tabs.
 func (s *Server) handleCreateTab(w http.ResponseWriter, r *http.Request) {
 	var req CreateTabRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	// Validate tab type
+	if !ValidTabTypes[req.Type] {
+		writeError(w, http.StatusBadRequest, "Invalid type: must be 'markdown', 'code', or 'diff'")
+		return
+	}
+
+	// Validate diff type has diff data
+	if req.Type == "diff" && req.Diff == nil && req.Content == "" && req.File == "" {
+		writeError(w, http.StatusBadRequest, "Diff type requires 'diff' object, 'content', or 'file'")
 		return
 	}
 
