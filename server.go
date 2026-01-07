@@ -13,19 +13,33 @@ import (
 
 // Server holds the HTTP server and application state.
 type Server struct {
-	httpServer *http.Server
-	state      *State
-	hub        *Hub
+	httpServer  *http.Server
+	state       *State
+	hub         *Hub
+	fileWatcher *FileWatcher
 }
 
 // NewServer creates a new Server instance.
 func NewServer() *Server {
 	state := NewState()
 	hub := NewHub()
-	return &Server{
+	s := &Server{
 		state: state,
 		hub:   hub,
 	}
+
+	// Initialize file watcher with onChange callback
+	watcher, err := NewFileWatcher(func(path string, tabIDs []string) {
+		s.handleFileChange(path, tabIDs)
+	})
+	if err != nil {
+		// Log error but continue without file watching
+		fmt.Printf("Warning: file watching disabled: %v\n", err)
+	} else {
+		s.fileWatcher = watcher
+	}
+
+	return s
 }
 
 // Serve starts the HTTP server on the given listener.
@@ -36,6 +50,11 @@ func (s *Server) Serve(listener net.Listener) error {
 
 	// Start WebSocket hub
 	go s.hub.Run()
+
+	// Start file watcher if available
+	if s.fileWatcher != nil {
+		go s.fileWatcher.Run()
+	}
 
 	return s.httpServer.Serve(listener)
 }
@@ -51,6 +70,11 @@ func (s *Server) ListenAndServe(addr string) error {
 
 // Shutdown gracefully shuts down the server.
 func (s *Server) Shutdown(ctx context.Context) error {
+	// Stop file watcher first
+	if s.fileWatcher != nil {
+		s.fileWatcher.Stop()
+	}
+
 	if s.httpServer != nil {
 		return s.httpServer.Shutdown(ctx)
 	}
@@ -95,3 +119,25 @@ func OpenBrowser(url string) error {
 
 // StartTime records when the server started.
 var StartTime = time.Now()
+
+// handleFileChange is called when a watched file changes.
+// It re-reads the file content, updates affected tabs, and broadcasts updates.
+func (s *Server) handleFileChange(path string, tabIDs []string) {
+	// Re-read the file content
+	content, err := ReadFileContent(path)
+	if err != nil {
+		// File might have been deleted or become unreadable
+		// Log but don't remove the watch - file might come back
+		fmt.Printf("Warning: cannot read changed file %s: %v\n", path, err)
+		return
+	}
+
+	// Update each tab that watches this file
+	for _, tabID := range tabIDs {
+		tab := s.state.UpdateTabContent(tabID, content)
+		if tab != nil {
+			// Broadcast the update to all connected clients
+			s.hub.Broadcast(WSMessage{Type: "tab_updated", Tab: tab})
+		}
+	}
+}

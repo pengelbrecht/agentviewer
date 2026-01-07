@@ -160,6 +160,15 @@ func (s *Server) handleCreateTab(w http.ResponseWriter, r *http.Request) {
 
 	tab, created := s.state.CreateTab(tab)
 
+	// Register file for watching if it has a source path
+	if tab.SourcePath != "" && s.fileWatcher != nil {
+		if err := s.fileWatcher.Add(tab.SourcePath, tab.ID); err != nil {
+			// Log but don't fail - watching is optional
+			// The tab was created successfully
+			_ = err // ignore error
+		}
+	}
+
 	// Broadcast to WebSocket clients
 	msgType := "tab_updated"
 	if created {
@@ -204,6 +213,12 @@ func (s *Server) handleGetTab(w http.ResponseWriter, r *http.Request) {
 // handleDeleteTab handles DELETE /api/tabs/{id}.
 func (s *Server) handleDeleteTab(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+
+	// Remove from file watcher before deleting
+	if s.fileWatcher != nil {
+		s.fileWatcher.Remove(id)
+	}
+
 	if !s.state.DeleteTab(id) {
 		writeError(w, http.StatusNotFound, "Tab not found")
 		return
@@ -231,6 +246,11 @@ func (s *Server) handleActivateTab(w http.ResponseWriter, r *http.Request) {
 
 // handleClearTabs handles DELETE /api/tabs.
 func (s *Server) handleClearTabs(w http.ResponseWriter, r *http.Request) {
+	// Clear file watches first
+	if s.fileWatcher != nil {
+		s.fileWatcher.Clear()
+	}
+
 	s.state.Clear()
 
 	// Broadcast to WebSocket clients

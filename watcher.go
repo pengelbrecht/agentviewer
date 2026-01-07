@@ -4,9 +4,14 @@ package main
 import (
 	"log"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 )
+
+// debounceDelay is how long to wait after a file event before notifying.
+// This handles editors that write multiple times in quick succession.
+const debounceDelay = 150 * time.Millisecond
 
 // FileWatcher watches files for changes and notifies when they are modified.
 // It is safe for concurrent use.
@@ -20,6 +25,9 @@ type FileWatcher struct {
 	// tabToPath maps tab IDs to the file path they are watching.
 	// Each tab watches at most one file.
 	tabToPath map[string]string
+	// pendingEvents tracks debounce timers for each path.
+	// Only accessed from Run() goroutine, no lock needed.
+	pendingEvents map[string]*time.Timer
 
 	// onChange is called when a watched file changes.
 	// Arguments are the file path and a list of tab IDs watching it.
@@ -38,11 +46,12 @@ func NewFileWatcher(onChange func(path string, tabIDs []string)) (*FileWatcher, 
 	}
 
 	return &FileWatcher{
-		watcher:    watcher,
-		pathToTabs: make(map[string]map[string]bool),
-		tabToPath:  make(map[string]string),
-		onChange:   onChange,
-		done:       make(chan struct{}),
+		watcher:       watcher,
+		pathToTabs:    make(map[string]map[string]bool),
+		tabToPath:     make(map[string]string),
+		pendingEvents: make(map[string]*time.Timer),
+		onChange:      onChange,
+		done:          make(chan struct{}),
 	}, nil
 }
 
@@ -52,6 +61,10 @@ func (fw *FileWatcher) Run() {
 	for {
 		select {
 		case <-fw.done:
+			// Stop all pending timers
+			for _, timer := range fw.pendingEvents {
+				timer.Stop()
+			}
 			return
 
 		case event, ok := <-fw.watcher.Events:
@@ -60,7 +73,7 @@ func (fw *FileWatcher) Run() {
 			}
 			// Handle Write and Create events (file modified or recreated)
 			if event.Op&(fsnotify.Write|fsnotify.Create) != 0 {
-				fw.handleChange(event.Name)
+				fw.scheduleChange(event.Name)
 			}
 
 		case err, ok := <-fw.watcher.Errors:
@@ -71,6 +84,24 @@ func (fw *FileWatcher) Run() {
 			log.Printf("file watcher error: %v", err)
 		}
 	}
+}
+
+// scheduleChange debounces file change events for a path.
+// Multiple rapid events for the same file will be coalesced into one notification.
+func (fw *FileWatcher) scheduleChange(path string) {
+	// If there's already a pending timer for this path, reset it
+	if timer, exists := fw.pendingEvents[path]; exists {
+		timer.Reset(debounceDelay)
+		return
+	}
+
+	// Create a new timer for this path
+	fw.pendingEvents[path] = time.AfterFunc(debounceDelay, func() {
+		// Remove from pending events
+		delete(fw.pendingEvents, path)
+		// Trigger the actual change handler
+		fw.handleChange(path)
+	})
 }
 
 // handleChange processes a file change event.
@@ -202,6 +233,21 @@ func (fw *FileWatcher) WatchCount() int {
 	fw.mu.RLock()
 	defer fw.mu.RUnlock()
 	return len(fw.pathToTabs)
+}
+
+// Clear removes all watches and clears all internal state.
+func (fw *FileWatcher) Clear() {
+	fw.mu.Lock()
+	defer fw.mu.Unlock()
+
+	// Remove all watches from fsnotify
+	for path := range fw.pathToTabs {
+		fw.watcher.Remove(path)
+	}
+
+	// Clear internal maps
+	fw.pathToTabs = make(map[string]map[string]bool)
+	fw.tabToPath = make(map[string]string)
 }
 
 // Stop stops the file watcher and closes all resources.

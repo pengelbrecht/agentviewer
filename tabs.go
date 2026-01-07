@@ -216,6 +216,26 @@ func (s *State) TabCount() int {
 	return len(s.tabs)
 }
 
+// UpdateTabContent updates only the content of a tab.
+// Returns the updated tab or nil if the tab doesn't exist.
+func (s *State) UpdateTabContent(id, content string) *Tab {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tab, exists := s.tabs[id]
+	if !exists {
+		return nil
+	}
+
+	tab.Content = content
+	tab.UpdatedAt = time.Now()
+
+	// Return a copy with active status
+	tabCopy := *tab
+	tabCopy.Active = (s.activeID == id)
+	return &tabCopy
+}
+
 // ReopenTab restores the most recently closed tab.
 // Returns the reopened tab, or nil if no closed tabs are available.
 func (s *State) ReopenTab() *Tab {
