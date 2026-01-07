@@ -20,6 +20,7 @@ type Hub struct {
 	register   chan *Client
 	unregister chan *Client
 	broadcast  chan []byte
+	done       chan struct{}
 }
 
 // Client represents a single WebSocket connection.
@@ -45,6 +46,7 @@ func NewHub() *Hub {
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		broadcast:  make(chan []byte, 256),
+		done:       make(chan struct{}),
 	}
 }
 
@@ -52,6 +54,16 @@ func NewHub() *Hub {
 func (h *Hub) Run() {
 	for {
 		select {
+		case <-h.done:
+			// Shutdown requested, close all clients
+			h.mu.Lock()
+			for client := range h.clients {
+				close(client.send)
+				delete(h.clients, client)
+			}
+			h.mu.Unlock()
+			return
+
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client] = true
@@ -96,6 +108,11 @@ func (h *Hub) ClientCount() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return len(h.clients)
+}
+
+// Shutdown gracefully stops the hub and closes all client connections.
+func (h *Hub) Shutdown() {
+	close(h.done)
 }
 
 // NewClient creates a new Client for the given connection.

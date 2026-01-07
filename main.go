@@ -2,9 +2,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
 const helpText = `agentviewer - Display rich content for AI agents in a browser
@@ -142,8 +146,40 @@ func runServe(args []string) {
 
 	fmt.Println("Press Ctrl+C to stop.")
 
-	if err := srv.ListenAndServe(addr); err != nil {
-		fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
+	// Start server in goroutine
+	serverErr := make(chan error, 1)
+	go func() {
+		serverErr <- srv.ListenAndServe(addr)
+	}()
+
+	// Set up signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Wait for signal or server error
+	select {
+	case sig := <-sigChan:
+		fmt.Printf("\nReceived %s, shutting down gracefully...\n", sig)
+	case err := <-serverErr:
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Graceful shutdown with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Shutdown WebSocket hub first
+	srv.hub.Shutdown()
+
+	// Then shutdown HTTP server
+	if err := srv.Shutdown(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Shutdown error: %v\n", err)
 		os.Exit(1)
 	}
+
+	fmt.Println("Server stopped.")
 }
