@@ -3,3 +3,5 @@
 
 1 | ParseDiffMode and buildGitDiffArgs (git diff mode parsing) | 75.9% | Added gitdiff_test.go testing all diff modes (commit, range, staged, head, unstaged) and error cases. Coverage up from 74.2%.
 2 | Live file watching (UpdateTabContent, MarkTabStale, ClearTabStale) | 78.9% | These power file watcher UX: auto-updating content and stale indicators when files change/delete. All 3 funcs now 100% covered.
+3 | Image tab creation from file path (handleCreateTab image branch) | 79.0% | Tests creating tabs from PNG files via API - users can display images by providing file paths. handleCreateTab now 100%.
+4 | Server file callbacks (handleFileChange, handleFileDelete) | 80.1% | These server methods re-read file content and broadcast updates when file watcher detects changes. Both now covered with tests for success paths, error handling (unreadable files), and multi-tab scenarios.
