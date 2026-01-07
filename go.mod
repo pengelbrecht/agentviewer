@@ -4,6 +4,7 @@ go 1.25.5
 
 require (
 	github.com/chromedp/chromedp v0.14.2
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/sergi/go-diff v1.4.0
 	nhooyr.io/websocket v1.8.17
 )

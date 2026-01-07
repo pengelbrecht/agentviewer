@@ -1,4 +1,4 @@
-# GitHub Flavored Markdown Test File
+# GitHub Flavored Markdown Test File (HOT RELOADED!)
 
 This file demonstrates various GFM features for testing agentviewer's markdown rendering.
 
