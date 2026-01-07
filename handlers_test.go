@@ -1153,3 +1153,67 @@ func TestValidTabTypes(t *testing.T) {
 		})
 	}
 }
+
+// TestCreateTab_ImageFile verifies that creating a tab from an image file
+// reads the image as a base64 data URL for display in the browser.
+func TestCreateTab_ImageFile(t *testing.T) {
+	srv := setupTestServer()
+	tmpDir := t.TempDir()
+
+	// Create a minimal valid PNG file (1x1 pixel)
+	pngData := []byte{
+		0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+		0x00, 0x00, 0x00, 0x0D, // IHDR chunk length
+		0x49, 0x48, 0x44, 0x52, // IHDR
+		0x00, 0x00, 0x00, 0x01, // width: 1
+		0x00, 0x00, 0x00, 0x01, // height: 1
+		0x08, 0x02, // bit depth 8, color type 2 (RGB)
+		0x00, 0x00, 0x00, // compression, filter, interlace
+		0x90, 0x77, 0x53, 0xDE, // CRC
+		0x00, 0x00, 0x00, 0x0C, // IDAT chunk length
+		0x49, 0x44, 0x41, 0x54, // IDAT
+		0x08, 0xD7, 0x63, 0xF8, 0xFF, 0xFF, 0x3F, 0x00, 0x05, 0xFE, 0x02, 0xFE, // compressed data
+		0xA3, 0x6D, 0xED, 0xC6, // CRC
+		0x00, 0x00, 0x00, 0x00, // IEND chunk length
+		0x49, 0x45, 0x4E, 0x44, // IEND
+		0xAE, 0x42, 0x60, 0x82, // CRC
+	}
+
+	imgPath := filepath.Join(tmpDir, "test.png")
+	if err := os.WriteFile(imgPath, pngData, 0644); err != nil {
+		t.Fatalf("failed to create test image: %v", err)
+	}
+
+	// Create tab with image file path
+	body := `{"title": "Test Image", "type": "image", "file": "` + imgPath + `"}`
+	req := httptest.NewRequest("POST", "/api/tabs", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	srv.handleCreateTab(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp CreateTabResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if resp.Type != "image" {
+		t.Errorf("expected type 'image', got %q", resp.Type)
+	}
+
+	// Verify the tab was created with content
+	tab, exists := srv.state.GetTab(resp.ID)
+	if !exists {
+		t.Fatal("tab was not created in state")
+	}
+
+	// Content should be a base64 data URL
+	if !strings.HasPrefix(tab.Content, "data:image/png;base64,") {
+		t.Errorf("expected content to be a data URL, got prefix: %s",
+			tab.Content[:min(30, len(tab.Content))])
+	}
+}
