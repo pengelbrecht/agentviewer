@@ -92,6 +92,598 @@ func createTestTab(t *testing.T, baseURL string, title, tabType, content string)
 	return id
 }
 
+// === Core Smoke Tests ===
+
+// TestBrowser_PageLoads verifies the page loads correctly.
+func TestBrowser_PageLoads(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var title string
+	var appVisible bool
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible("#app", chromedp.ByID),
+		chromedp.Title(&title),
+		chromedp.Evaluate(`document.getElementById('app') !== null`, &appVisible),
+	)
+
+	if err != nil {
+		t.Fatalf("browser test failed: %v", err)
+	}
+
+	if title != "agentviewer" {
+		t.Errorf("expected title 'agentviewer', got %q", title)
+	}
+
+	if !appVisible {
+		t.Error("expected app element to be visible")
+	}
+}
+
+// TestBrowser_EmptyState verifies the empty state is shown when no tabs exist.
+func TestBrowser_EmptyState(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var emptyText string
+	var emptyStateVisible bool
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible(".empty-state", chromedp.ByQuery),
+		chromedp.Evaluate(`document.querySelector('.empty-state') !== null`, &emptyStateVisible),
+		chromedp.Text(".empty-state h2", &emptyText, chromedp.ByQuery),
+	)
+
+	if err != nil {
+		t.Fatalf("browser test failed: %v", err)
+	}
+
+	if !emptyStateVisible {
+		t.Error("expected empty state to be visible")
+	}
+
+	if emptyText != "No tabs open" {
+		t.Errorf("expected 'No tabs open', got %q", emptyText)
+	}
+}
+
+// TestBrowser_TabsRender verifies that tabs render correctly.
+func TestBrowser_TabsRender(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	// Create tabs before opening the browser
+	createTestTab(t, baseURL, "First Tab", "markdown", "# Hello World")
+	createTestTab(t, baseURL, "Second Tab", "markdown", "# Second Content")
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var tabCount int
+	var firstTabTitle string
+	var hasActiveTab bool
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible("#tabs-container", chromedp.ByID),
+		// Wait for tabs to load
+		chromedp.Sleep(500*time.Millisecond),
+		chromedp.Evaluate(`document.querySelectorAll('.tab').length`, &tabCount),
+		chromedp.Evaluate(`document.querySelector('.tab .tab-title')?.textContent || ''`, &firstTabTitle),
+		chromedp.Evaluate(`document.querySelector('.tab.active') !== null`, &hasActiveTab),
+	)
+
+	if err != nil {
+		t.Fatalf("browser test failed: %v", err)
+	}
+
+	if tabCount != 2 {
+		t.Errorf("expected 2 tabs, got %d", tabCount)
+	}
+
+	if firstTabTitle == "" {
+		t.Error("expected tab title to be rendered")
+	}
+
+	if !hasActiveTab {
+		t.Error("expected one tab to be active")
+	}
+}
+
+// TestBrowser_TabSwitching verifies clicking tabs switches content.
+func TestBrowser_TabSwitching(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	createTestTab(t, baseURL, "Tab One", "markdown", "# Content One")
+	createTestTab(t, baseURL, "Tab Two", "markdown", "# Content Two")
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var initialContent string
+	var afterClickContent string
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible(".content-markdown", chromedp.ByQuery),
+		chromedp.Sleep(500*time.Millisecond),
+		// Get initial content (should be tab 1)
+		chromedp.Evaluate(`document.querySelector('.content-markdown h1')?.textContent || ''`, &initialContent),
+		// Click on the last tab (Tab Two)
+		chromedp.Click(`.tab:last-child`, chromedp.ByQuery),
+		chromedp.Sleep(500*time.Millisecond),
+		// Get content after click
+		chromedp.Evaluate(`document.querySelector('.content-markdown h1')?.textContent || ''`, &afterClickContent),
+	)
+
+	if err != nil {
+		t.Fatalf("browser test failed: %v", err)
+	}
+
+	if initialContent != "Content One" {
+		t.Errorf("expected initial content 'Content One', got %q", initialContent)
+	}
+
+	if afterClickContent != "Content Two" {
+		t.Errorf("expected content after click 'Content Two', got %q", afterClickContent)
+	}
+}
+
+// TestBrowser_TabClose verifies closing tabs works.
+func TestBrowser_TabClose(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	createTestTab(t, baseURL, "Tab to Close", "markdown", "# Close Me")
+	createTestTab(t, baseURL, "Remaining Tab", "markdown", "# Stay")
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var initialTabCount int
+	var afterCloseTabCount int
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible("#tabs-container", chromedp.ByID),
+		chromedp.Sleep(500*time.Millisecond),
+		chromedp.Evaluate(`document.querySelectorAll('.tab').length`, &initialTabCount),
+		// Click close button on first tab
+		chromedp.Click(`.tab:first-child .tab-close`, chromedp.ByQuery),
+		chromedp.Sleep(500*time.Millisecond),
+		chromedp.Evaluate(`document.querySelectorAll('.tab').length`, &afterCloseTabCount),
+	)
+
+	if err != nil {
+		t.Fatalf("browser test failed: %v", err)
+	}
+
+	if initialTabCount != 2 {
+		t.Errorf("expected 2 tabs initially, got %d", initialTabCount)
+	}
+
+	if afterCloseTabCount != 1 {
+		t.Errorf("expected 1 tab after close, got %d", afterCloseTabCount)
+	}
+}
+
+// TestBrowser_WebSocketUpdates verifies live updates via WebSocket.
+func TestBrowser_WebSocketUpdates(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var initialTabCount int
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible("#app", chromedp.ByID),
+		chromedp.Sleep(500*time.Millisecond),
+		// Check initial tab count (should be 0)
+		chromedp.Evaluate(`document.querySelectorAll('.tab').length`, &initialTabCount),
+	)
+
+	if err != nil {
+		t.Fatalf("browser test failed: %v", err)
+	}
+
+	if initialTabCount != 0 {
+		t.Errorf("expected 0 tabs initially, got %d", initialTabCount)
+	}
+
+	// Create a tab via the API while browser is open
+	createTestTab(t, baseURL, "Live Created Tab", "markdown", "# Created Live")
+
+	var afterCreateTabCount int
+
+	// Check if the tab appears via WebSocket update
+	err = chromedp.Run(ctx,
+		chromedp.Sleep(1*time.Second), // Wait for WebSocket message
+		chromedp.Evaluate(`document.querySelectorAll('.tab').length`, &afterCreateTabCount),
+	)
+
+	if err != nil {
+		t.Fatalf("browser test failed: %v", err)
+	}
+
+	if afterCreateTabCount != 1 {
+		t.Errorf("expected 1 tab after WebSocket create, got %d", afterCreateTabCount)
+	}
+}
+
+// TestBrowser_ConnectionStatus verifies the connection status indicator works.
+func TestBrowser_ConnectionStatus(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var statusExists bool
+	var statusConnected bool
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible("#app", chromedp.ByID),
+		// Give time for WebSocket to connect and status to update
+		chromedp.Sleep(1*time.Second),
+		chromedp.Evaluate(`document.getElementById('connection-status') !== null`, &statusExists),
+		chromedp.Evaluate(`document.getElementById('connection-status')?.classList.contains('connected') || false`, &statusConnected),
+	)
+
+	if err != nil {
+		t.Fatalf("browser test failed: %v", err)
+	}
+
+	if !statusExists {
+		t.Error("expected connection status element to exist")
+	}
+
+	if !statusConnected {
+		t.Error("expected connection status to show connected")
+	}
+}
+
+// TestBrowser_ThemeToggle verifies the theme toggle works.
+func TestBrowser_ThemeToggle(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var initialTheme string
+	var afterToggleTheme string
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible("#theme-toggle", chromedp.ByID),
+		chromedp.Sleep(200*time.Millisecond),
+		// Get initial theme
+		chromedp.Evaluate(`document.documentElement.getAttribute('data-theme') || ''`, &initialTheme),
+		// Click theme toggle
+		chromedp.Click("#theme-toggle", chromedp.ByID),
+		chromedp.Sleep(200*time.Millisecond),
+		// Get theme after toggle
+		chromedp.Evaluate(`document.documentElement.getAttribute('data-theme') || ''`, &afterToggleTheme),
+	)
+
+	if err != nil {
+		t.Fatalf("browser test failed: %v", err)
+	}
+
+	// After toggle, theme should be set
+	if afterToggleTheme == "" {
+		t.Error("expected theme to be set after toggle")
+	}
+
+	// Valid theme values
+	if afterToggleTheme != "light" && afterToggleTheme != "dark" {
+		t.Errorf("expected theme to be 'light' or 'dark', got %q", afterToggleTheme)
+	}
+}
+
+// TestBrowser_CodeTabRendering verifies code tabs render with syntax highlighting.
+func TestBrowser_CodeTabRendering(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	// Create code tab with explicit language
+	body := map[string]string{
+		"title":    "Code Tab",
+		"type":     "code",
+		"content":  "package main\n\nfunc main() {\n\tfmt.Println(\"Hello\")\n}",
+		"language": "go",
+	}
+	bodyBytes, _ := json.Marshal(body)
+	resp, _ := http.Post(baseURL+"/api/tabs", "application/json", bytes.NewReader(bodyBytes))
+	resp.Body.Close()
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var hasCodeContent bool
+	var hasLineNumbers bool
+	var languageLabel string
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible(".content-code", chromedp.ByQuery),
+		chromedp.Evaluate(`document.querySelector('.content-code') !== null`, &hasCodeContent),
+		chromedp.Evaluate(`document.querySelector('.code-line .line-number') !== null`, &hasLineNumbers),
+		chromedp.Evaluate(`document.querySelector('.code-language')?.textContent || ''`, &languageLabel),
+	)
+
+	if err != nil {
+		t.Fatalf("browser test failed: %v", err)
+	}
+
+	if !hasCodeContent {
+		t.Error("expected code content container to exist")
+	}
+
+	if !hasLineNumbers {
+		t.Error("expected line numbers to exist")
+	}
+
+	if languageLabel != "go" {
+		t.Errorf("expected language 'go', got %q", languageLabel)
+	}
+}
+
+// TestBrowser_DiffTabRendering verifies diff tabs render correctly.
+func TestBrowser_DiffTabRendering(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	diff := "--- a/old.txt\n+++ b/new.txt\n@@ -1,3 +1,3 @@\n line1\n-old line\n+new line\n line3"
+	createTestTab(t, baseURL, "Diff Tab", "diff", diff)
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var hasDiffContent bool
+	var hasDiffTable bool
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible(".content-diff", chromedp.ByQuery),
+		chromedp.Evaluate(`document.querySelector('.content-diff') !== null`, &hasDiffContent),
+		// Check for either diff2html table or fallback table
+		chromedp.Evaluate(`document.querySelector('.d2h-diff-table') !== null || document.querySelector('.diff-table') !== null`, &hasDiffTable),
+	)
+
+	if err != nil {
+		t.Fatalf("browser test failed: %v", err)
+	}
+
+	if !hasDiffContent {
+		t.Error("expected diff content container to exist")
+	}
+
+	if !hasDiffTable {
+		t.Error("expected diff table to exist")
+	}
+}
+
+// TestBrowser_MultipleTabTypes verifies different tab types can coexist.
+func TestBrowser_MultipleTabTypes(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	// Create tabs of different types
+	createTestTab(t, baseURL, "Markdown", "markdown", "# Markdown Content")
+
+	// Create code tab with language
+	body := map[string]string{
+		"title":    "Code",
+		"type":     "code",
+		"content":  "fmt.Println(\"test\")",
+		"language": "go",
+	}
+	bodyBytes, _ := json.Marshal(body)
+	resp, _ := http.Post(baseURL+"/api/tabs", "application/json", bytes.NewReader(bodyBytes))
+	resp.Body.Close()
+
+	createTestTab(t, baseURL, "Diff", "diff", "--- a\n+++ b\n@@ -1 +1 @@\n-old\n+new")
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(),
+		append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.Flag("headless", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("no-sandbox", true),
+		)...,
+	)
+	defer allocCancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var tabCount int
+	var mdContent bool
+	var codeContent bool
+	var diffContent bool
+
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(baseURL),
+		chromedp.WaitVisible("#tabs-container", chromedp.ByID),
+		chromedp.Sleep(500*time.Millisecond),
+		chromedp.Evaluate(`document.querySelectorAll('.tab').length`, &tabCount),
+
+		// Click markdown tab and verify content
+		chromedp.Click(`.tab:nth-child(1)`, chromedp.ByQuery),
+		chromedp.Sleep(300*time.Millisecond),
+		chromedp.Evaluate(`document.querySelector('.content-markdown') !== null`, &mdContent),
+
+		// Click code tab and verify content
+		chromedp.Click(`.tab:nth-child(2)`, chromedp.ByQuery),
+		chromedp.Sleep(300*time.Millisecond),
+		chromedp.Evaluate(`document.querySelector('.content-code') !== null`, &codeContent),
+
+		// Click diff tab and verify content
+		chromedp.Click(`.tab:nth-child(3)`, chromedp.ByQuery),
+		chromedp.Sleep(300*time.Millisecond),
+		chromedp.Evaluate(`document.querySelector('.content-diff') !== null`, &diffContent),
+	)
+
+	if err != nil {
+		t.Fatalf("browser test failed: %v", err)
+	}
+
+	if tabCount != 3 {
+		t.Errorf("expected 3 tabs, got %d", tabCount)
+	}
+
+	if !mdContent {
+		t.Error("expected markdown content to render")
+	}
+
+	if !codeContent {
+		t.Error("expected code content to render")
+	}
+
+	if !diffContent {
+		t.Error("expected diff content to render")
+	}
+}
+
+// === Mermaid and Feature Tests ===
+
 // TestBrowserMermaidRendering verifies that mermaid diagrams are rendered correctly.
 func TestBrowserMermaidRendering(t *testing.T) {
 	baseURL, cleanup := startTestServer(t)

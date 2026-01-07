@@ -4,6 +4,7 @@ go 1.25.5
 
 require (
 	github.com/chromedp/chromedp v0.14.2
+	github.com/sergi/go-diff v1.4.0
 	nhooyr.io/websocket v1.8.17
 )
 
@@ -14,6 +15,5 @@ require (
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.4.0 // indirect
-	github.com/sergi/go-diff v1.4.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 )
