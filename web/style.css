@@ -490,6 +490,15 @@ html, body {
     margin: 0;
 }
 
+/* Override highlight.js background to use our CSS variables */
+.content-code .hljs {
+    background: transparent;
+}
+
+.content-code .code-table .hljs {
+    background: transparent;
+}
+
 /* Code header with language label and copy button */
 .code-header {
     display: flex;
