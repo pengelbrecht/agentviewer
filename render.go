@@ -12,11 +12,41 @@ import (
 )
 
 // ReadFileContent reads a file and returns its content.
+// It validates that the path exists, is a regular file (not a directory),
+// and is readable. Returns the content as a string.
 func ReadFileContent(path string) (string, error) {
-	data, err := os.ReadFile(path)
+	// Clean the path to normalize it
+	cleanPath := filepath.Clean(path)
+
+	// Get file info to validate the path
+	info, err := os.Stat(cleanPath)
 	if err != nil {
-		return "", err
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("file not found: %s", cleanPath)
+		}
+		if os.IsPermission(err) {
+			return "", fmt.Errorf("permission denied: %s", cleanPath)
+		}
+		return "", fmt.Errorf("cannot access file: %w", err)
 	}
+
+	// Ensure it's a regular file, not a directory or other type
+	if info.IsDir() {
+		return "", fmt.Errorf("path is a directory, not a file: %s", cleanPath)
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("path is not a regular file: %s", cleanPath)
+	}
+
+	// Read the file content
+	data, err := os.ReadFile(cleanPath)
+	if err != nil {
+		if os.IsPermission(err) {
+			return "", fmt.Errorf("permission denied reading file: %s", cleanPath)
+		}
+		return "", fmt.Errorf("failed to read file: %w", err)
+	}
+
 	return string(data), nil
 }
 

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -240,6 +241,10 @@ func TestReadFileContent(t *testing.T) {
 		if err == nil {
 			t.Error("ReadFileContent should return error for non-existent file")
 		}
+		// Check error message mentions "file not found"
+		if err != nil && !strings.Contains(err.Error(), "file not found") {
+			t.Errorf("Error should mention 'file not found', got: %v", err)
+		}
 	})
 
 	// Test reading a file with unicode content
@@ -257,6 +262,98 @@ func TestReadFileContent(t *testing.T) {
 		}
 		if result != content {
 			t.Errorf("ReadFileContent = %q, want %q", result, content)
+		}
+	})
+
+	// Test reading a directory returns error
+	t.Run("read directory returns error", func(t *testing.T) {
+		dirPath := filepath.Join(tmpDir, "testdir")
+		err := os.Mkdir(dirPath, 0755)
+		if err != nil {
+			t.Fatalf("Failed to create test directory: %v", err)
+		}
+
+		_, err = ReadFileContent(dirPath)
+		if err == nil {
+			t.Error("ReadFileContent should return error for directory")
+		}
+		if err != nil && !strings.Contains(err.Error(), "directory") {
+			t.Errorf("Error should mention 'directory', got: %v", err)
+		}
+	})
+
+	// Test reading empty file
+	t.Run("read empty file", func(t *testing.T) {
+		path := filepath.Join(tmpDir, "empty.txt")
+		err := os.WriteFile(path, []byte(""), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create test file: %v", err)
+		}
+
+		result, err := ReadFileContent(path)
+		if err != nil {
+			t.Errorf("ReadFileContent returned error for empty file: %v", err)
+		}
+		if result != "" {
+			t.Errorf("ReadFileContent = %q, want empty string", result)
+		}
+	})
+
+	// Test path normalization with trailing slashes and dots
+	t.Run("path normalization", func(t *testing.T) {
+		content := "normalized content"
+		path := filepath.Join(tmpDir, "normalized.txt")
+		err := os.WriteFile(path, []byte(content), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create test file: %v", err)
+		}
+
+		// Try with redundant path components
+		messyPath := filepath.Join(tmpDir, ".", "normalized.txt")
+		result, err := ReadFileContent(messyPath)
+		if err != nil {
+			t.Errorf("ReadFileContent returned error: %v", err)
+		}
+		if result != content {
+			t.Errorf("ReadFileContent = %q, want %q", result, content)
+		}
+	})
+
+	// Test reading large file
+	t.Run("read large file", func(t *testing.T) {
+		// Create a 1MB file
+		largeContent := strings.Repeat("abcdefghij", 100000) // 1MB
+		path := filepath.Join(tmpDir, "large.txt")
+		err := os.WriteFile(path, []byte(largeContent), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create large test file: %v", err)
+		}
+
+		result, err := ReadFileContent(path)
+		if err != nil {
+			t.Errorf("ReadFileContent returned error for large file: %v", err)
+		}
+		if result != largeContent {
+			t.Errorf("ReadFileContent returned wrong content length: got %d, want %d",
+				len(result), len(largeContent))
+		}
+	})
+
+	// Test binary file with null bytes
+	t.Run("read binary file", func(t *testing.T) {
+		binaryContent := []byte{0x00, 0x01, 0x02, 0x03, 0xFF, 0xFE}
+		path := filepath.Join(tmpDir, "binary.bin")
+		err := os.WriteFile(path, binaryContent, 0644)
+		if err != nil {
+			t.Fatalf("Failed to create binary test file: %v", err)
+		}
+
+		result, err := ReadFileContent(path)
+		if err != nil {
+			t.Errorf("ReadFileContent returned error for binary file: %v", err)
+		}
+		if result != string(binaryContent) {
+			t.Errorf("ReadFileContent returned wrong content for binary file")
 		}
 	})
 }
