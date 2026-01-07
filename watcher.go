@@ -33,13 +33,30 @@ type FileWatcher struct {
 	// Arguments are the file path and a list of tab IDs watching it.
 	onChange func(path string, tabIDs []string)
 
+	// onDelete is called when a watched file is deleted or renamed.
+	// Arguments are the file path and a list of tab IDs that were watching it.
+	onDelete func(path string, tabIDs []string)
+
 	// done signals shutdown
 	done chan struct{}
+}
+
+// FileWatcherCallbacks holds callbacks for file watcher events.
+type FileWatcherCallbacks struct {
+	// OnChange is called when a watched file is modified.
+	OnChange func(path string, tabIDs []string)
+	// OnDelete is called when a watched file is deleted or renamed.
+	OnDelete func(path string, tabIDs []string)
 }
 
 // NewFileWatcher creates a new FileWatcher.
 // The onChange callback is invoked when any watched file is modified.
 func NewFileWatcher(onChange func(path string, tabIDs []string)) (*FileWatcher, error) {
+	return NewFileWatcherWithCallbacks(FileWatcherCallbacks{OnChange: onChange})
+}
+
+// NewFileWatcherWithCallbacks creates a new FileWatcher with full callbacks.
+func NewFileWatcherWithCallbacks(callbacks FileWatcherCallbacks) (*FileWatcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
@@ -50,7 +67,8 @@ func NewFileWatcher(onChange func(path string, tabIDs []string)) (*FileWatcher, 
 		pathToTabs:    make(map[string]map[string]bool),
 		tabToPath:     make(map[string]string),
 		pendingEvents: make(map[string]*time.Timer),
-		onChange:      onChange,
+		onChange:      callbacks.OnChange,
+		onDelete:      callbacks.OnDelete,
 		done:          make(chan struct{}),
 	}, nil
 }
@@ -74,6 +92,10 @@ func (fw *FileWatcher) Run() {
 			// Handle Write and Create events (file modified or recreated)
 			if event.Op&(fsnotify.Write|fsnotify.Create) != 0 {
 				fw.scheduleChange(event.Name)
+			}
+			// Handle Remove and Rename events (file deleted or renamed)
+			if event.Op&(fsnotify.Remove|fsnotify.Rename) != 0 {
+				fw.handleDelete(event.Name)
 			}
 
 		case err, ok := <-fw.watcher.Errors:
@@ -123,6 +145,36 @@ func (fw *FileWatcher) handleChange(path string) {
 	// Invoke callback outside lock
 	if fw.onChange != nil {
 		fw.onChange(path, tabIDs)
+	}
+}
+
+// handleDelete processes a file delete/rename event.
+// It stops watching the file but keeps the tab->path mappings so the tab
+// can resume watching if the file is recreated.
+func (fw *FileWatcher) handleDelete(path string) {
+	fw.mu.RLock()
+	tabSet, exists := fw.pathToTabs[path]
+	if !exists || len(tabSet) == 0 {
+		fw.mu.RUnlock()
+		return
+	}
+
+	// Copy tab IDs to avoid holding lock during callback
+	tabIDs := make([]string, 0, len(tabSet))
+	for tabID := range tabSet {
+		tabIDs = append(tabIDs, tabID)
+	}
+	fw.mu.RUnlock()
+
+	// Cancel any pending change event for this path
+	if timer, exists := fw.pendingEvents[path]; exists {
+		timer.Stop()
+		delete(fw.pendingEvents, path)
+	}
+
+	// Invoke callback outside lock
+	if fw.onDelete != nil {
+		fw.onDelete(path, tabIDs)
 	}
 }
 

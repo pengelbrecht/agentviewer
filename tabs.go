@@ -26,6 +26,7 @@ type Tab struct {
 	Language   string    `json:"language,omitempty"`
 	DiffMeta   *DiffMeta `json:"diff,omitempty"`
 	SourcePath string    `json:"sourcePath,omitempty"` // File path for auto-reload; only set when created from file
+	Stale      bool      `json:"stale,omitempty"`      // True when source file was deleted/renamed; content preserved
 	Active     bool      `json:"active,omitempty"`
 	CreatedAt  time.Time `json:"createdAt"`
 	UpdatedAt  time.Time `json:"updatedAt"`
@@ -228,6 +229,47 @@ func (s *State) UpdateTabContent(id, content string) *Tab {
 	}
 
 	tab.Content = content
+	tab.Stale = false // File was just read, so it's no longer stale
+	tab.UpdatedAt = time.Now()
+
+	// Return a copy with active status
+	tabCopy := *tab
+	tabCopy.Active = (s.activeID == id)
+	return &tabCopy
+}
+
+// MarkTabStale marks a tab as stale (source file deleted/renamed).
+// Content is preserved. Returns the updated tab or nil if the tab doesn't exist.
+func (s *State) MarkTabStale(id string) *Tab {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tab, exists := s.tabs[id]
+	if !exists {
+		return nil
+	}
+
+	tab.Stale = true
+	tab.UpdatedAt = time.Now()
+
+	// Return a copy with active status
+	tabCopy := *tab
+	tabCopy.Active = (s.activeID == id)
+	return &tabCopy
+}
+
+// ClearTabStale removes the stale flag from a tab.
+// Returns the updated tab or nil if the tab doesn't exist.
+func (s *State) ClearTabStale(id string) *Tab {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tab, exists := s.tabs[id]
+	if !exists {
+		return nil
+	}
+
+	tab.Stale = false
 	tab.UpdatedAt = time.Now()
 
 	// Return a copy with active status

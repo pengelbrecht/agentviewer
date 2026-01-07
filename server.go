@@ -28,9 +28,14 @@ func NewServer() *Server {
 		hub:   hub,
 	}
 
-	// Initialize file watcher with onChange callback
-	watcher, err := NewFileWatcher(func(path string, tabIDs []string) {
-		s.handleFileChange(path, tabIDs)
+	// Initialize file watcher with callbacks
+	watcher, err := NewFileWatcherWithCallbacks(FileWatcherCallbacks{
+		OnChange: func(path string, tabIDs []string) {
+			s.handleFileChange(path, tabIDs)
+		},
+		OnDelete: func(path string, tabIDs []string) {
+			s.handleFileDelete(path, tabIDs)
+		},
 	})
 	if err != nil {
 		// Log error but continue without file watching
@@ -138,6 +143,19 @@ func (s *Server) handleFileChange(path string, tabIDs []string) {
 		if tab != nil {
 			// Broadcast the update to all connected clients
 			s.hub.Broadcast(WSMessage{Type: "tab_updated", Tab: tab})
+		}
+	}
+}
+
+// handleFileDelete is called when a watched file is deleted or renamed.
+// It marks affected tabs as stale and broadcasts updates.
+func (s *Server) handleFileDelete(path string, tabIDs []string) {
+	// Mark each tab that watches this file as stale
+	for _, tabID := range tabIDs {
+		tab := s.state.MarkTabStale(tabID)
+		if tab != nil {
+			// Broadcast the update to all connected clients
+			s.hub.Broadcast(WSMessage{Type: "tab_stale", Tab: tab})
 		}
 	}
 }
