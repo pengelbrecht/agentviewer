@@ -306,9 +306,9 @@
     // Post-render processing for content types
     function postRenderContent(type) {
         if (type === 'markdown') {
-            // Highlight code blocks in markdown
+            // Highlight code blocks that weren't highlighted during render (fallback)
             if (typeof hljs !== 'undefined') {
-                contentArea.querySelectorAll('pre code').forEach((block) => {
+                contentArea.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
                     hljs.highlightElement(block);
                 });
             }
@@ -355,40 +355,63 @@
         });
     }
 
-    // Configure marked.js
+    // Configure marked.js with highlight.js integration
     function configureMarked() {
         if (typeof marked === 'undefined') return;
 
-        // Custom renderer for mermaid and math
-        const renderer = new marked.Renderer();
-
-        // Handle code blocks
-        renderer.code = function(code, language) {
-            // Mermaid diagrams
-            if (language === 'mermaid') {
-                return `<div class="mermaid">${escapeHtml(code)}</div>`;
-            }
-
-            // Regular code blocks - highlight.js will process them post-render
-            const langClass = language ? `language-${escapeHtml(language)}` : '';
-            return `<pre><code class="${langClass}">${escapeHtml(code)}</code></pre>`;
-        };
-
-        // Handle math in paragraphs and text
-        const originalParagraph = renderer.paragraph.bind(renderer);
-        renderer.paragraph = function(text) {
-            // Replace display math: $$...$$
-            text = text.replace(/\$\$([^$]+)\$\$/g, '<span class="katex-display">$1</span>');
-            // Replace inline math: $...$
-            text = text.replace(/\$([^$\n]+)\$/g, '<span class="katex-inline">$1</span>');
-            return originalParagraph(text);
-        };
-
-        marked.setOptions({
-            renderer: renderer,
+        // Use marked.use() for extensions (works with v15+)
+        marked.use({
+            // Enable GFM
             gfm: true,
             breaks: false,
-            pedantic: false
+            pedantic: false,
+
+            // Custom renderer using the new token-based API
+            useNewRenderer: true,
+            renderer: {
+                // Handle code blocks with highlight.js
+                code(token) {
+                    const code = token.text || '';
+                    const lang = token.lang || '';
+
+                    // Mermaid diagrams
+                    if (lang === 'mermaid') {
+                        return `<div class="mermaid">${escapeHtml(code)}</div>`;
+                    }
+
+                    // Syntax highlighting with highlight.js
+                    let highlighted = escapeHtml(code);
+                    if (typeof hljs !== 'undefined') {
+                        try {
+                            if (lang && hljs.getLanguage(lang)) {
+                                highlighted = hljs.highlight(code, { language: lang }).value;
+                            } else if (code.trim()) {
+                                // Auto-detect language for non-empty code
+                                highlighted = hljs.highlightAuto(code).value;
+                            }
+                        } catch (e) {
+                            console.error('Highlight.js error:', e);
+                            highlighted = escapeHtml(code);
+                        }
+                    }
+
+                    const langClass = lang ? `language-${escapeHtml(lang)}` : '';
+                    return `<pre><code class="hljs ${langClass}">${highlighted}</code></pre>`;
+                },
+
+                // Handle paragraphs for math detection
+                paragraph(token) {
+                    // Get the text from the token
+                    let text = this.parser.parseInline(token.tokens);
+
+                    // Replace display math: $$...$$
+                    text = text.replace(/\$\$([^$]+)\$\$/g, '<span class="katex-display">$1</span>');
+                    // Replace inline math: $...$
+                    text = text.replace(/\$([^$\n]+)\$/g, '<span class="katex-inline">$1</span>');
+
+                    return `<p>${text}</p>\n`;
+                }
+            }
         });
     }
 
