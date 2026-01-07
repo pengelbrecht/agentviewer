@@ -587,6 +587,7 @@
     function renderDiff(content, tab) {
         // Generate a unique container ID for this diff
         const containerId = 'diff-container-' + Date.now();
+        const navId = 'diff-nav-' + Date.now();
 
         // Use Diff2HtmlUI if available (from diff2html-ui bundle)
         if (typeof Diff2HtmlUI !== 'undefined') {
@@ -633,28 +634,40 @@
                     // Apply syntax highlighting
                     diff2htmlUi.highlightCode();
 
+                    // Setup navigation after diff is rendered
+                    setupDiffNavigation(navId, container);
+
                 } catch (e) {
                     console.error('Diff2HtmlUI error:', e);
                     // Fallback on error - pass language for highlighting
                     const lang = detectDiffLanguage(tab);
                     container.innerHTML = renderSideBySideFallback(content, lang);
+                    setupDiffNavigation(navId, container);
                 }
             }, 0);
 
-            return `<div id="${containerId}" class="diff2html-wrapper"></div>`;
+            return renderDiffNavBar(navId) + `<div id="${containerId}" class="diff2html-wrapper"></div>`;
         }
 
         // Fallback to Diff2Html.html (non-UI version) if available
         if (typeof Diff2Html !== 'undefined') {
             try {
                 const normalizedContent = normalizeUnifiedDiff(content);
-                return Diff2Html.html(normalizedContent, {
+                const diffHtml = Diff2Html.html(normalizedContent, {
                     drawFileList: false,
                     matching: 'lines',
                     outputFormat: 'side-by-side',
                     renderNothingWhenEmpty: false,
                     colorScheme: 'auto'
                 });
+                // Setup navigation after DOM is updated
+                setTimeout(() => {
+                    const navEl = document.getElementById(navId);
+                    if (navEl) {
+                        setupDiffNavigation(navId, navEl.parentElement.querySelector('.diff2html-wrapper, .diff-side-by-side'));
+                    }
+                }, 0);
+                return renderDiffNavBar(navId) + `<div class="diff2html-wrapper">${diffHtml}</div>`;
             } catch (e) {
                 console.error('Diff2Html error:', e);
             }
@@ -662,7 +675,153 @@
 
         // Fallback: custom side-by-side diff rendering with syntax highlighting
         const lang = detectDiffLanguage(tab);
-        return renderSideBySideFallback(content, lang);
+        const fallbackHtml = renderSideBySideFallback(content, lang);
+        // Setup navigation after DOM is updated
+        setTimeout(() => {
+            const navEl = document.getElementById(navId);
+            if (navEl) {
+                setupDiffNavigation(navId, navEl.parentElement.querySelector('.diff-side-by-side'));
+            }
+        }, 0);
+        return renderDiffNavBar(navId) + fallbackHtml;
+    }
+
+    // Render the diff navigation bar HTML
+    function renderDiffNavBar(navId) {
+        return `<div id="${navId}" class="diff-nav">
+            <div class="diff-nav-info">
+                <span class="diff-nav-count">0 changes</span>
+                <span class="diff-nav-current"></span>
+            </div>
+            <div class="diff-nav-buttons">
+                <button class="diff-nav-btn" data-action="prev" title="Previous change (↑)">
+                    <span>↑</span> Prev
+                </button>
+                <button class="diff-nav-btn" data-action="next" title="Next change (↓)">
+                    <span>↓</span> Next
+                </button>
+            </div>
+        </div>`;
+    }
+
+    // Setup diff navigation functionality
+    function setupDiffNavigation(navId, diffContainer) {
+        const navEl = document.getElementById(navId);
+        if (!navEl || !diffContainer) return;
+
+        // Find all change rows (additions and deletions)
+        // For diff2html: .d2h-ins, .d2h-del rows
+        // For fallback: .diff-add, .diff-delete rows
+        const changeRows = diffContainer.querySelectorAll(
+            '.d2h-ins, .d2h-del, tr:has(.diff-add), tr:has(.diff-delete)'
+        );
+
+        // Group consecutive changes into hunks for navigation
+        const changeHunks = [];
+        let currentHunk = [];
+        let lastRow = null;
+
+        changeRows.forEach((row) => {
+            // Check if this row is consecutive to the last one
+            if (lastRow && lastRow.nextElementSibling === row) {
+                currentHunk.push(row);
+            } else {
+                if (currentHunk.length > 0) {
+                    changeHunks.push(currentHunk);
+                }
+                currentHunk = [row];
+            }
+            lastRow = row;
+        });
+        if (currentHunk.length > 0) {
+            changeHunks.push(currentHunk);
+        }
+
+        // Update count display
+        const countEl = navEl.querySelector('.diff-nav-count');
+        const currentEl = navEl.querySelector('.diff-nav-current');
+        const totalChanges = changeHunks.length;
+
+        if (countEl) {
+            countEl.textContent = `${totalChanges} ${totalChanges === 1 ? 'change' : 'changes'}`;
+        }
+
+        // Track current position
+        let currentIndex = -1;
+
+        function updateCurrentDisplay() {
+            if (currentEl) {
+                if (currentIndex >= 0 && totalChanges > 0) {
+                    currentEl.textContent = `(${currentIndex + 1}/${totalChanges})`;
+                } else {
+                    currentEl.textContent = '';
+                }
+            }
+        }
+
+        function highlightCurrentChange() {
+            // Remove previous highlight
+            diffContainer.querySelectorAll('.diff-nav-highlight').forEach(el => {
+                el.classList.remove('diff-nav-highlight');
+            });
+
+            // Add highlight to current hunk
+            if (currentIndex >= 0 && currentIndex < changeHunks.length) {
+                changeHunks[currentIndex].forEach(row => {
+                    row.classList.add('diff-nav-highlight');
+                });
+            }
+        }
+
+        function navigateTo(index) {
+            if (totalChanges === 0) return;
+
+            // Clamp index
+            currentIndex = Math.max(0, Math.min(index, totalChanges - 1));
+
+            // Scroll to the change
+            const targetRow = changeHunks[currentIndex][0];
+            if (targetRow) {
+                targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            updateCurrentDisplay();
+            highlightCurrentChange();
+        }
+
+        function navigateNext() {
+            if (totalChanges === 0) return;
+            navigateTo(currentIndex + 1 >= totalChanges ? 0 : currentIndex + 1);
+        }
+
+        function navigatePrev() {
+            if (totalChanges === 0) return;
+            navigateTo(currentIndex - 1 < 0 ? totalChanges - 1 : currentIndex - 1);
+        }
+
+        // Setup button handlers
+        navEl.querySelectorAll('.diff-nav-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const action = btn.dataset.action;
+                if (action === 'next') navigateNext();
+                else if (action === 'prev') navigatePrev();
+            });
+        });
+
+        // Keyboard navigation within the diff area
+        diffContainer.setAttribute('tabindex', '0');
+        diffContainer.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown' || e.key === 'j') {
+                e.preventDefault();
+                navigateNext();
+            } else if (e.key === 'ArrowUp' || e.key === 'k') {
+                e.preventDefault();
+                navigatePrev();
+            }
+        });
+
+        // Initialize display
+        updateCurrentDisplay();
     }
 
     // Detect programming language from tab metadata or diff content

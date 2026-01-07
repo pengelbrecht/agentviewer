@@ -798,6 +798,102 @@ html, body {
     font-style: italic;
 }
 
+/* Diff navigation bar */
+.diff-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    font-size: var(--font-size-small);
+}
+
+.diff-nav + .diff2html-wrapper,
+.diff-nav + .diff-side-by-side {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+.diff-nav + .diff2html-wrapper .d2h-file-wrapper {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+.diff-nav-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+}
+
+.diff-nav-count {
+    font-weight: 500;
+}
+
+.diff-nav-current {
+    color: var(--text-muted);
+}
+
+.diff-nav-buttons {
+    display: flex;
+    gap: 6px;
+}
+
+.diff-nav-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-size: var(--font-size-small);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.diff-nav-btn:hover {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-color: var(--accent);
+}
+
+.diff-nav-btn:active {
+    transform: scale(0.95);
+}
+
+.diff-nav-btn span {
+    font-weight: 600;
+}
+
+/* Highlight for currently navigated change */
+.diff-nav-highlight {
+    outline: 2px solid var(--accent) !important;
+    outline-offset: -2px;
+    position: relative;
+}
+
+.diff-nav-highlight::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--accent);
+}
+
+/* Make diff container focusable for keyboard navigation */
+.diff2html-wrapper:focus,
+.diff-side-by-side:focus {
+    outline: none;
+}
+
 /* Diff fallback (simple line rendering) */
 .diff-fallback {
     padding: 12px;
