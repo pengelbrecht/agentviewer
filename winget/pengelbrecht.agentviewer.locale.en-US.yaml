@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+
+PackageIdentifier: pengelbrecht.agentviewer
+PackageVersion: 0.1.0
+PackageLocale: en-US
+Publisher: pengelbrecht
+PublisherUrl: https://github.com/pengelbrecht
+PublisherSupportUrl: https://github.com/pengelbrecht/agentviewer/issues
+Author: pengelbrecht
+PackageName: agentviewer
+PackageUrl: https://github.com/pengelbrecht/agentviewer
+License: MIT
+LicenseUrl: https://github.com/pengelbrecht/agentviewer/blob/main/LICENSE
+Copyright: Copyright (c) pengelbrecht
+ShortDescription: CLI tool for AI agents to display rich content in a browser
+Description: |-
+  agentviewer is a localhost web server that allows AI agents (Claude Code, etc.) to display rich content to users in a browser.
+  Features include:
+  - Tabbed browser interface for viewing multiple documents
+  - Markdown with GitHub Flavored Markdown, Mermaid diagrams, and LaTeX math
+  - Code with syntax highlighting (180+ languages)
+  - Diffs with side-by-side comparison view
+  - Live updates via WebSocket
+  - REST API for programmatic control by AI agents
+Tags:
+  - ai
+  - agent
+  - cli
+  - developer-tools
+  - markdown
+  - viewer
+  - web-server
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

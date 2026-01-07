@@ -1,0 +1,23 @@
+{
+    "version": "0.1.0",
+    "description": "CLI tool for AI agents to display rich content in a browser",
+    "homepage": "https://github.com/pengelbrecht/agentviewer",
+    "license": "MIT",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/pengelbrecht/agentviewer/releases/download/v0.1.0/agentviewer-windows-amd64.exe",
+            "hash": "PLACEHOLDER_SHA256_WINDOWS_AMD64"
+        }
+    },
+    "bin": [["agentviewer-windows-amd64.exe", "agentviewer"]],
+    "checkver": {
+        "github": "https://github.com/pengelbrecht/agentviewer"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/pengelbrecht/agentviewer/releases/download/v$version/agentviewer-windows-amd64.exe"
+            }
+        }
+    }
+}

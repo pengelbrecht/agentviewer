@@ -31,6 +31,33 @@ brew tap pengelbrecht/agentviewer
 brew install agentviewer
 ```
 
+### Windows (Scoop)
+
+```powershell
+scoop bucket add agentviewer https://github.com/pengelbrecht/scoop-agentviewer
+scoop install agentviewer
+```
+
+### Windows (Winget)
+
+```powershell
+winget install pengelbrecht.agentviewer
+```
+
+*Note: Winget package pending submission to winget-pkgs repository.*
+
+### Windows (Binary)
+
+Download from [GitHub Releases](https://github.com/pengelbrecht/agentviewer/releases):
+
+```powershell
+# Download and add to PATH
+Invoke-WebRequest -Uri "https://github.com/pengelbrecht/agentviewer/releases/latest/download/agentviewer-windows-amd64.exe" -OutFile "$env:LOCALAPPDATA\agentviewer.exe"
+$env:PATH += ";$env:LOCALAPPDATA"
+```
+
+Or download `agentviewer-windows-amd64.exe` manually and add to your PATH.
+
 ### Linux (apt/deb - Debian, Ubuntu)
 
 ```bash
