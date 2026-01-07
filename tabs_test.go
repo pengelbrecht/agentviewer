@@ -947,3 +947,228 @@ func TestDeleteTabStoresClosed(t *testing.T) {
 		t.Errorf("expected 1 closed tab after delete, got %d", state.ClosedTabCount())
 	}
 }
+
+// TestUpdateTabContent verifies live file update functionality.
+// This is a key user-facing feature: when a watched file changes,
+// users see the updated content in their browser automatically.
+func TestUpdateTabContent(t *testing.T) {
+	t.Run("updates content of existing tab", func(t *testing.T) {
+		state := NewState()
+		tab := &Tab{ID: "live-update", Title: "File", Type: TabTypeCode, Content: "original content"}
+		state.CreateTab(tab)
+
+		updated := state.UpdateTabContent("live-update", "new content")
+
+		if updated == nil {
+			t.Fatal("expected updated tab, got nil")
+		}
+
+		if updated.Content != "new content" {
+			t.Errorf("expected content 'new content', got %q", updated.Content)
+		}
+
+		// Verify change persisted
+		retrieved, _ := state.GetTab("live-update")
+		if retrieved.Content != "new content" {
+			t.Errorf("expected persisted content 'new content', got %q", retrieved.Content)
+		}
+	})
+
+	t.Run("returns nil for non-existing tab", func(t *testing.T) {
+		state := NewState()
+
+		updated := state.UpdateTabContent("non-existent", "content")
+
+		if updated != nil {
+			t.Errorf("expected nil for non-existing tab, got %v", updated)
+		}
+	})
+
+	t.Run("clears stale flag on update", func(t *testing.T) {
+		state := NewState()
+		tab := &Tab{ID: "stale-test", Title: "File", Type: TabTypeCode, Content: "content"}
+		state.CreateTab(tab)
+
+		// Mark as stale first
+		state.MarkTabStale("stale-test")
+		stale, _ := state.GetTab("stale-test")
+		if !stale.Stale {
+			t.Fatal("expected tab to be stale")
+		}
+
+		// Update clears stale flag
+		updated := state.UpdateTabContent("stale-test", "fresh content")
+
+		if updated.Stale {
+			t.Error("expected stale flag to be cleared after update")
+		}
+	})
+
+	t.Run("updates UpdatedAt timestamp", func(t *testing.T) {
+		state := NewState()
+		tab := &Tab{ID: "timestamp-test", Title: "File", Type: TabTypeCode, Content: "content"}
+		created, _ := state.CreateTab(tab)
+		originalTime := created.UpdatedAt
+
+		updated := state.UpdateTabContent("timestamp-test", "new content")
+
+		if !updated.UpdatedAt.After(originalTime) && !updated.UpdatedAt.Equal(originalTime) {
+			t.Error("expected UpdatedAt to be updated")
+		}
+	})
+
+	t.Run("sets active flag correctly", func(t *testing.T) {
+		state := NewState()
+		tab1 := &Tab{ID: "tab1", Title: "Tab 1", Type: TabTypeCode, Content: "content"}
+		tab2 := &Tab{ID: "tab2", Title: "Tab 2", Type: TabTypeCode, Content: "content"}
+		state.CreateTab(tab1)
+		state.CreateTab(tab2)
+
+		// tab1 is active (first created)
+		updated1 := state.UpdateTabContent("tab1", "new")
+		updated2 := state.UpdateTabContent("tab2", "new")
+
+		if !updated1.Active {
+			t.Error("expected tab1 to have Active=true")
+		}
+		if updated2.Active {
+			t.Error("expected tab2 to have Active=false")
+		}
+	})
+}
+
+// TestMarkTabStale verifies stale indicator functionality.
+// When a watched file is deleted, users see a stale indicator so they
+// know the displayed content may be outdated.
+func TestMarkTabStale(t *testing.T) {
+	t.Run("marks existing tab as stale", func(t *testing.T) {
+		state := NewState()
+		tab := &Tab{ID: "stale-test", Title: "File", Type: TabTypeCode, Content: "content"}
+		state.CreateTab(tab)
+
+		// Initially not stale
+		retrieved, _ := state.GetTab("stale-test")
+		if retrieved.Stale {
+			t.Error("expected tab to not be stale initially")
+		}
+
+		stale := state.MarkTabStale("stale-test")
+
+		if stale == nil {
+			t.Fatal("expected stale tab, got nil")
+		}
+
+		if !stale.Stale {
+			t.Error("expected Stale flag to be true")
+		}
+
+		// Verify persisted
+		retrieved2, _ := state.GetTab("stale-test")
+		if !retrieved2.Stale {
+			t.Error("expected stale flag to persist")
+		}
+	})
+
+	t.Run("returns nil for non-existing tab", func(t *testing.T) {
+		state := NewState()
+
+		stale := state.MarkTabStale("non-existent")
+
+		if stale != nil {
+			t.Errorf("expected nil for non-existing tab, got %v", stale)
+		}
+	})
+
+	t.Run("preserves content when marked stale", func(t *testing.T) {
+		state := NewState()
+		tab := &Tab{ID: "preserve-test", Title: "File", Type: TabTypeCode, Content: "important content"}
+		state.CreateTab(tab)
+
+		state.MarkTabStale("preserve-test")
+
+		retrieved, _ := state.GetTab("preserve-test")
+		if retrieved.Content != "important content" {
+			t.Errorf("expected content to be preserved, got %q", retrieved.Content)
+		}
+	})
+
+	t.Run("sets active flag correctly", func(t *testing.T) {
+		state := NewState()
+		tab := &Tab{ID: "active-test", Title: "Tab", Type: TabTypeCode, Content: "content"}
+		state.CreateTab(tab)
+
+		stale := state.MarkTabStale("active-test")
+
+		if !stale.Active {
+			t.Error("expected Active=true for the only (active) tab")
+		}
+	})
+}
+
+// TestClearTabStale verifies clearing the stale flag.
+// When a deleted file reappears (e.g., user restores it), the stale
+// indicator is cleared.
+func TestClearTabStale(t *testing.T) {
+	t.Run("clears stale flag on existing tab", func(t *testing.T) {
+		state := NewState()
+		tab := &Tab{ID: "clear-test", Title: "File", Type: TabTypeCode, Content: "content"}
+		state.CreateTab(tab)
+
+		// Mark and then clear
+		state.MarkTabStale("clear-test")
+		cleared := state.ClearTabStale("clear-test")
+
+		if cleared == nil {
+			t.Fatal("expected cleared tab, got nil")
+		}
+
+		if cleared.Stale {
+			t.Error("expected Stale flag to be false after clearing")
+		}
+
+		// Verify persisted
+		retrieved, _ := state.GetTab("clear-test")
+		if retrieved.Stale {
+			t.Error("expected stale=false to persist")
+		}
+	})
+
+	t.Run("returns nil for non-existing tab", func(t *testing.T) {
+		state := NewState()
+
+		cleared := state.ClearTabStale("non-existent")
+
+		if cleared != nil {
+			t.Errorf("expected nil for non-existing tab, got %v", cleared)
+		}
+	})
+
+	t.Run("no-op on non-stale tab", func(t *testing.T) {
+		state := NewState()
+		tab := &Tab{ID: "noop-test", Title: "File", Type: TabTypeCode, Content: "content"}
+		state.CreateTab(tab)
+
+		cleared := state.ClearTabStale("noop-test")
+
+		if cleared == nil {
+			t.Fatal("expected tab, got nil")
+		}
+
+		if cleared.Stale {
+			t.Error("expected Stale to remain false")
+		}
+	})
+
+	t.Run("sets active flag correctly", func(t *testing.T) {
+		state := NewState()
+		tab := &Tab{ID: "active-test", Title: "Tab", Type: TabTypeCode, Content: "content"}
+		state.CreateTab(tab)
+		state.MarkTabStale("active-test")
+
+		cleared := state.ClearTabStale("active-test")
+
+		if !cleared.Active {
+			t.Error("expected Active=true for the only (active) tab")
+		}
+	})
+}
