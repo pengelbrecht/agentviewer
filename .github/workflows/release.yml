@@ -163,11 +163,12 @@ jobs:
     if: ${{ always() && needs.release.result != 'cancelled' && !contains(github.ref_name, '-') }}
 
     steps:
-      - name: Checkout code
+      - name: Checkout homebrew tap
         uses: actions/checkout@v4
         with:
-          ref: main
-          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pengelbrecht/homebrew-agentviewer
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
 
       - name: Download checksums
         uses: actions/download-artifact@v4
@@ -191,27 +192,24 @@ jobs:
           echo "Linux ARM64: $SHA_LINUX_ARM64"
           echo "Linux AMD64: $SHA_LINUX_AMD64"
 
+          FORMULA=homebrew-tap/Formula/agentviewer.rb
+
           # Update version
-          sed -i "s/version \".*\"/version \"${{ steps.version.outputs.VERSION }}\"/" homebrew/Formula/agentviewer.rb
+          sed -i "s/version \".*\"/version \"${{ steps.version.outputs.VERSION }}\"/" $FORMULA
 
-          # Update SHA256 hashes (replace placeholders or existing hashes)
-          sed -i "s/sha256 \"PLACEHOLDER_SHA256_DARWIN_ARM64\"/sha256 \"$SHA_DARWIN_ARM64\"/" homebrew/Formula/agentviewer.rb
-          sed -i "s/sha256 \"PLACEHOLDER_SHA256_DARWIN_AMD64\"/sha256 \"$SHA_DARWIN_AMD64\"/" homebrew/Formula/agentviewer.rb
-          sed -i "s/sha256 \"PLACEHOLDER_SHA256_LINUX_ARM64\"/sha256 \"$SHA_LINUX_ARM64\"/" homebrew/Formula/agentviewer.rb
-          sed -i "s/sha256 \"PLACEHOLDER_SHA256_LINUX_AMD64\"/sha256 \"$SHA_LINUX_AMD64\"/" homebrew/Formula/agentviewer.rb
+          # Update SHA256 hashes (replace existing 64-char hashes)
+          sed -i "s/sha256 \"[a-f0-9]\{64\}\"\(.*darwin-arm64\)/sha256 \"$SHA_DARWIN_ARM64\"\1/" $FORMULA
+          sed -i "s/sha256 \"[a-f0-9]\{64\}\"\(.*darwin-amd64\)/sha256 \"$SHA_DARWIN_AMD64\"\1/" $FORMULA
+          sed -i "s/sha256 \"[a-f0-9]\{64\}\"\(.*linux-arm64\)/sha256 \"$SHA_LINUX_ARM64\"\1/" $FORMULA
+          sed -i "s/sha256 \"[a-f0-9]\{64\}\"\(.*linux-amd64\)/sha256 \"$SHA_LINUX_AMD64\"\1/" $FORMULA
 
-          # Also handle updates (replace existing 64-char hashes)
-          sed -i "s/sha256 \"[a-f0-9]\{64\}\"\(.*darwin-arm64\)/sha256 \"$SHA_DARWIN_ARM64\"\1/" homebrew/Formula/agentviewer.rb
-          sed -i "s/sha256 \"[a-f0-9]\{64\}\"\(.*darwin-amd64\)/sha256 \"$SHA_DARWIN_AMD64\"\1/" homebrew/Formula/agentviewer.rb
-          sed -i "s/sha256 \"[a-f0-9]\{64\}\"\(.*linux-arm64\)/sha256 \"$SHA_LINUX_ARM64\"\1/" homebrew/Formula/agentviewer.rb
-          sed -i "s/sha256 \"[a-f0-9]\{64\}\"\(.*linux-amd64\)/sha256 \"$SHA_LINUX_AMD64\"\1/" homebrew/Formula/agentviewer.rb
-
-          cat homebrew/Formula/agentviewer.rb
+          cat $FORMULA
 
       - name: Commit and push formula update
+        working-directory: homebrew-tap
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add homebrew/Formula/agentviewer.rb
-          git commit -m "Update Homebrew formula for ${{ github.ref_name }}" || echo "No changes to commit"
+          git add Formula/agentviewer.rb
+          git commit -m "Update agentviewer to ${{ github.ref_name }}" || echo "No changes to commit"
           git push
