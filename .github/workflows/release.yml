@@ -197,11 +197,11 @@ jobs:
           # Update version
           sed -i "s/version \".*\"/version \"${{ steps.version.outputs.VERSION }}\"/" $FORMULA
 
-          # Update SHA256 hashes (replace existing 64-char hashes)
-          sed -i "s/sha256 \"[a-f0-9]\{64\}\"\(.*darwin-arm64\)/sha256 \"$SHA_DARWIN_ARM64\"\1/" $FORMULA
-          sed -i "s/sha256 \"[a-f0-9]\{64\}\"\(.*darwin-amd64\)/sha256 \"$SHA_DARWIN_AMD64\"\1/" $FORMULA
-          sed -i "s/sha256 \"[a-f0-9]\{64\}\"\(.*linux-arm64\)/sha256 \"$SHA_LINUX_ARM64\"\1/" $FORMULA
-          sed -i "s/sha256 \"[a-f0-9]\{64\}\"\(.*linux-amd64\)/sha256 \"$SHA_LINUX_AMD64\"\1/" $FORMULA
+          # Update SHA256 hashes using awk (finds URL line, updates sha256 on next line)
+          awk -v sha="$SHA_DARWIN_ARM64" '/darwin-arm64"$/{getline; sub(/sha256 "[^"]*"/, "sha256 \""sha"\"")}1' $FORMULA > tmp && mv tmp $FORMULA
+          awk -v sha="$SHA_DARWIN_AMD64" '/darwin-amd64"$/{getline; sub(/sha256 "[^"]*"/, "sha256 \""sha"\"")}1' $FORMULA > tmp && mv tmp $FORMULA
+          awk -v sha="$SHA_LINUX_ARM64" '/linux-arm64"$/{getline; sub(/sha256 "[^"]*"/, "sha256 \""sha"\"")}1' $FORMULA > tmp && mv tmp $FORMULA
+          awk -v sha="$SHA_LINUX_AMD64" '/linux-amd64"$/{getline; sub(/sha256 "[^"]*"/, "sha256 \""sha"\"")}1' $FORMULA > tmp && mv tmp $FORMULA
 
           cat $FORMULA
 
