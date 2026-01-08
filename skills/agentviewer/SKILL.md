@@ -17,14 +17,51 @@ Display rich content in a browser-based tabbed viewer. Perfect for showing users
 
 ## Prerequisites
 
+The agentviewer CLI must be installed and available in your PATH.
+
+### Installation Options
+
+**macOS/Linux (Homebrew):**
 ```bash
-agentviewer --version  # Requires agentviewer installed
+brew tap pengelbrecht/agentviewer
+brew install agentviewer
 ```
 
-Install via:
-- **Homebrew**: `brew install agentviewer`
-- **Go**: `go install github.com/pengelbrecht/agentviewer@latest`
-- **Binary**: Download from GitHub releases
+**Windows (Scoop):**
+```powershell
+scoop bucket add agentviewer https://github.com/pengelbrecht/scoop-agentviewer
+scoop install agentviewer
+```
+
+**Windows (Winget):**
+```powershell
+winget install pengelbrecht.agentviewer
+```
+
+**Linux (deb - Debian/Ubuntu):**
+```bash
+curl -LO https://github.com/pengelbrecht/agentviewer/releases/latest/download/agentviewer_amd64.deb
+sudo dpkg -i agentviewer_amd64.deb
+```
+
+**Linux (rpm - Fedora/RHEL):**
+```bash
+curl -LO https://github.com/pengelbrecht/agentviewer/releases/latest/download/agentviewer.amd64.rpm
+sudo rpm -i agentviewer.amd64.rpm
+```
+
+**Go:**
+```bash
+go install github.com/pengelbrecht/agentviewer@latest
+```
+
+**Binary:** Download from [GitHub Releases](https://github.com/pengelbrecht/agentviewer/releases)
+
+### Verify Installation
+
+```bash
+agentviewer --version
+```
 
 ## Quick Start
 

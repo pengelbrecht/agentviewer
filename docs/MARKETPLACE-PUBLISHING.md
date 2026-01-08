@@ -106,6 +106,45 @@ npm publish claude-plugin-agentviewer
 
 ## Plugin Requirements
 
+### External Dependency: agentviewer CLI
+
+Users must install the agentviewer CLI before using the plugin. Installation options:
+
+**macOS/Linux (Homebrew):**
+```bash
+brew tap pengelbrecht/agentviewer
+brew install agentviewer
+```
+
+**Windows (Scoop):**
+```powershell
+scoop bucket add agentviewer https://github.com/pengelbrecht/scoop-agentviewer
+scoop install agentviewer
+```
+
+**Windows (Winget):**
+```powershell
+winget install pengelbrecht.agentviewer
+```
+
+**Linux (deb/rpm):**
+```bash
+# Debian/Ubuntu
+curl -LO https://github.com/pengelbrecht/agentviewer/releases/latest/download/agentviewer_amd64.deb
+sudo dpkg -i agentviewer_amd64.deb
+
+# Fedora/RHEL
+curl -LO https://github.com/pengelbrecht/agentviewer/releases/latest/download/agentviewer.amd64.rpm
+sudo rpm -i agentviewer.amd64.rpm
+```
+
+**Go:**
+```bash
+go install github.com/pengelbrecht/agentviewer@latest
+```
+
+**Binary:** Download from [GitHub Releases](https://github.com/pengelbrecht/agentviewer/releases)
+
 ### Required Files
 
 **plugin.json** (minimum):

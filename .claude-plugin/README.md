@@ -41,5 +41,54 @@ The skill provides API documentation and best practices for interacting with the
 
 ## Requirements
 
-- agentviewer CLI installed and in PATH
-- Run `agentviewer serve --open &` to start the server
+The agentviewer CLI must be installed and available in your PATH.
+
+### Installation Options
+
+**macOS/Linux (Homebrew):**
+```bash
+brew tap pengelbrecht/agentviewer
+brew install agentviewer
+```
+
+**Windows (Scoop):**
+```powershell
+scoop bucket add agentviewer https://github.com/pengelbrecht/scoop-agentviewer
+scoop install agentviewer
+```
+
+**Windows (Winget):**
+```powershell
+winget install pengelbrecht.agentviewer
+```
+
+**Linux (deb - Debian/Ubuntu):**
+```bash
+curl -LO https://github.com/pengelbrecht/agentviewer/releases/latest/download/agentviewer_amd64.deb
+sudo dpkg -i agentviewer_amd64.deb
+```
+
+**Linux (rpm - Fedora/RHEL):**
+```bash
+curl -LO https://github.com/pengelbrecht/agentviewer/releases/latest/download/agentviewer.amd64.rpm
+sudo rpm -i agentviewer.amd64.rpm
+```
+
+**Go:**
+```bash
+go install github.com/pengelbrecht/agentviewer@latest
+```
+
+**Binary:** Download from [GitHub Releases](https://github.com/pengelbrecht/agentviewer/releases)
+
+### Verify Installation
+
+```bash
+agentviewer --version
+```
+
+### Start the Server
+
+```bash
+agentviewer serve --open &
+```
