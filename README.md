@@ -27,7 +27,7 @@ A localhost web server that allows AI agents (Claude Code, etc.) to display rich
 ### macOS (Homebrew)
 
 ```bash
-brew install pengelbrecht/agentviewer/agentviewer
+brew install pengelbrecht/tap/agentviewer
 ```
 
 ### Windows (Scoop)

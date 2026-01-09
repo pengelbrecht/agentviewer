@@ -112,8 +112,7 @@ Users must install the agentviewer CLI before using the plugin. Installation opt
 
 **macOS/Linux (Homebrew):**
 ```bash
-brew tap pengelbrecht/agentviewer
-brew install agentviewer
+brew install pengelbrecht/tap/agentviewer
 ```
 
 **Windows (Scoop):**

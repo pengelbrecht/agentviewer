@@ -47,8 +47,7 @@ The agentviewer CLI must be installed and available in your PATH.
 
 **macOS/Linux (Homebrew):**
 ```bash
-brew tap pengelbrecht/agentviewer
-brew install agentviewer
+brew install pengelbrecht/tap/agentviewer
 ```
 
 **Windows (Scoop):**
