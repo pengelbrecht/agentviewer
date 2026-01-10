@@ -1,0 +1,12 @@
+{
+  "id": "ldx",
+  "title": "Create CSV test files for table rendering",
+  "description": "Create test CSV files in testdata/ to exercise CSV rendering:\n- simple.csv - basic data\n- headers.csv - various header styles  \n- quoted.csv - fields with commas, quotes, newlines\n- large.csv - many rows/columns for scroll testing\n- unicode.csv - international characters\n- empty.csv - edge case",
+  "status": "open",
+  "priority": 2,
+  "type": "task",
+  "owner": "peter@engelbrecht.dk",
+  "created_by": "peter@engelbrecht.dk",
+  "created_at": "2026-01-07T22:18:40.260946+01:00",
+  "updated_at": "2026-01-07T22:18:40.260946+01:00"
+}

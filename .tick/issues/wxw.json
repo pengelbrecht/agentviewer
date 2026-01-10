@@ -1,0 +1,12 @@
+{
+  "id": "wxw",
+  "title": "Add unit tests for git diff helper",
+  "description": "Write comprehensive unit tests for the git diff helper.\n\n## Test Cases\n1. GitDiff with unstaged changes\n2. GitDiff with staged changes  \n3. GitDiff with no changes (empty diff)\n4. GitDiff on file not in git repo (error)\n5. GitDiff on untracked file (error)\n6. GitDiff with invalid commit ref (error)\n7. GitDiff with commit mode\n8. GitDiff with range mode\n\n## Setup\n- Use testdata/ with a temporary git repo\n- Or mock git command execution\n- Test both success and error paths",
+  "status": "open",
+  "priority": 2,
+  "type": "task",
+  "owner": "peter@engelbrecht.dk",
+  "created_by": "peter@engelbrecht.dk",
+  "created_at": "2026-01-07T21:04:08.909654+01:00",
+  "updated_at": "2026-01-07T21:04:08.909654+01:00"
+}

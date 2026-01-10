@@ -1,0 +1,12 @@
+{
+  "id": "ya9",
+  "title": "Browser e2e tests for code tab type",
+  "description": "Add chromedp tests for standalone code tabs: verify syntax highlighting applies, language detection works, line numbers display correctly, various languages render properly (Go, TypeScript, Python, etc.)",
+  "status": "open",
+  "priority": 2,
+  "type": "task",
+  "owner": "peter@engelbrecht.dk",
+  "created_by": "peter@engelbrecht.dk",
+  "created_at": "2026-01-07T17:53:02.537719+01:00",
+  "updated_at": "2026-01-07T17:53:02.537719+01:00"
+}

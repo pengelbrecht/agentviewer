@@ -1,0 +1,12 @@
+{
+  "id": "l0e",
+  "title": "Browser e2e tests for tab navigation",
+  "description": "Add chromedp tests for tab interactions: clicking tabs switches content, active tab styling updates, tab close button works, multiple tabs display correctly.",
+  "status": "open",
+  "priority": 3,
+  "type": "task",
+  "owner": "peter@engelbrecht.dk",
+  "created_by": "peter@engelbrecht.dk",
+  "created_at": "2026-01-07T17:53:23.614534+01:00",
+  "updated_at": "2026-01-07T17:53:23.614534+01:00"
+}

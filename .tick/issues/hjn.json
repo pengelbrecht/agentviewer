@@ -1,0 +1,12 @@
+{
+  "id": "hjn",
+  "title": "Browser e2e tests for CSV tab type",
+  "description": "Add chromedp browser tests for CSV rendering:\n- Verify table renders with correct rows/columns\n- Test sorting functionality\n- Test horizontal scroll on wide tables\n- Verify quoted/escaped content displays correctly",
+  "status": "open",
+  "priority": 2,
+  "type": "task",
+  "owner": "peter@engelbrecht.dk",
+  "created_by": "peter@engelbrecht.dk",
+  "created_at": "2026-01-07T22:18:51.486703+01:00",
+  "updated_at": "2026-01-07T22:18:51.486703+01:00"
+}

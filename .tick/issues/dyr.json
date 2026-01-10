@@ -1,0 +1,12 @@
+{
+  "id": "dyr",
+  "title": "Handle git diff errors gracefully in UI",
+  "description": "Ensure the UI handles git diff errors gracefully.\n\n## Error Scenarios\n- File not in a git repository\n- File not tracked by git\n- Invalid commit/ref\n- Git not installed\n- Permission denied\n\n## UI Behavior\n- Show clear error message in the tab content area\n- Don't crash or show blank screen\n- Suggest possible fixes (e.g., \"This file is not in a git repository\")",
+  "status": "open",
+  "priority": 3,
+  "type": "task",
+  "owner": "peter@engelbrecht.dk",
+  "created_by": "peter@engelbrecht.dk",
+  "created_at": "2026-01-07T21:04:09.157223+01:00",
+  "updated_at": "2026-01-07T21:04:09.157223+01:00"
+}

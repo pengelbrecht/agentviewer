@@ -1,0 +1,12 @@
+{
+  "id": "rki",
+  "title": "Browser e2e tests for image tab type",
+  "description": "Add chromedp tests for image tabs: verify images render inline, various formats work (png, jpg, svg, webp, gif), image scaling/sizing behaves correctly.",
+  "status": "open",
+  "priority": 2,
+  "type": "task",
+  "owner": "peter@engelbrecht.dk",
+  "created_by": "peter@engelbrecht.dk",
+  "created_at": "2026-01-07T17:53:17.203056+01:00",
+  "updated_at": "2026-01-07T17:53:17.203056+01:00"
+}

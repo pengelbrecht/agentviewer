@@ -1,0 +1,12 @@
+{
+  "id": "7w3",
+  "title": "Create image test files (.png, .jpg, .svg)",
+  "description": "Create testdata/ image files: sample.png, sample.jpg, sample.svg for testing image file support and rendering.",
+  "status": "open",
+  "priority": 2,
+  "type": "task",
+  "owner": "peter@engelbrecht.dk",
+  "created_by": "peter@engelbrecht.dk",
+  "created_at": "2026-01-07T16:44:11.304217+01:00",
+  "updated_at": "2026-01-07T16:44:11.304217+01:00"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "ge4",
+  "title": "Browser e2e tests for diff tab type",
+  "description": "Add chromedp tests for diff tabs: verify unified diff renders, side-by-side view works, line additions/deletions styled correctly, diff metadata (file labels) displays properly.",
+  "status": "open",
+  "priority": 2,
+  "type": "task",
+  "owner": "peter@engelbrecht.dk",
+  "created_by": "peter@engelbrecht.dk",
+  "created_at": "2026-01-07T17:53:10.178816+01:00",
+  "updated_at": "2026-01-07T17:53:10.178816+01:00"
+}

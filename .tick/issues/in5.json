@@ -1,0 +1,12 @@
+{
+  "id": "in5",
+  "title": "Add e2e tests for git diff API",
+  "description": "Write e2e tests that exercise the git diff API end-to-end.\n\n## Test Scenarios\n1. Create diff tab with path + diffMode=unstaged\n2. Create diff tab with path + diffMode=staged\n3. Create diff tab with path + diffMode=head\n4. Error case: path not in git repo\n5. Error case: invalid diffMode\n6. Verify diff content is properly rendered in browser (chromedp)\n\n## Setup\n- Create temp directory with git repo\n- Make file changes (staged and unstaged)\n- Call API and verify responses",
+  "status": "open",
+  "priority": 2,
+  "type": "task",
+  "owner": "peter@engelbrecht.dk",
+  "created_by": "peter@engelbrecht.dk",
+  "created_at": "2026-01-07T21:04:09.021681+01:00",
+  "updated_at": "2026-01-07T21:04:09.021681+01:00"
+}

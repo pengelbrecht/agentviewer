@@ -1,0 +1,12 @@
+{
+  "id": "vpy",
+  "title": "E2E test for file watching hot reload",
+  "description": "Browser e2e test: (1) start server, (2) create tab from file via API, (3) modify file on disk, (4) verify browser content updates via chromedp.",
+  "status": "open",
+  "priority": 3,
+  "type": "task",
+  "owner": "peter@engelbrecht.dk",
+  "created_by": "peter@engelbrecht.dk",
+  "created_at": "2026-01-07T20:34:21.56671+01:00",
+  "updated_at": "2026-01-07T20:34:21.56671+01:00"
+}
