@@ -130,6 +130,24 @@ jobs:
           path: binaries
           merge-multiple: true
 
+      - name: Create version-less package copies for stable URLs
+        working-directory: binaries
+        run: |
+          # Create version-less copies of .deb and .rpm files so /latest/download/ URLs work
+          for deb in agentviewer_*_amd64.deb; do
+            [ -f "$deb" ] && cp "$deb" agentviewer_amd64.deb
+          done
+          for deb in agentviewer_*_arm64.deb; do
+            [ -f "$deb" ] && cp "$deb" agentviewer_arm64.deb
+          done
+          for rpm in agentviewer-*-*.x86_64.rpm; do
+            [ -f "$rpm" ] && cp "$rpm" agentviewer_x86_64.rpm
+          done
+          for rpm in agentviewer-*-*.aarch64.rpm; do
+            [ -f "$rpm" ] && cp "$rpm" agentviewer_aarch64.rpm
+          done
+          ls -la
+
       - name: Generate checksums
         working-directory: binaries
         run: |

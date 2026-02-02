@@ -45,8 +45,8 @@ sudo dpkg -i agentviewer_amd64.deb
 
 **Linux (rpm - Fedora/RHEL):**
 ```bash
-curl -LO https://github.com/pengelbrecht/agentviewer/releases/latest/download/agentviewer.amd64.rpm
-sudo rpm -i agentviewer.amd64.rpm
+curl -LO https://github.com/pengelbrecht/agentviewer/releases/latest/download/agentviewer_x86_64.rpm
+sudo rpm -i agentviewer_x86_64.rpm
 ```
 
 **Go:**
